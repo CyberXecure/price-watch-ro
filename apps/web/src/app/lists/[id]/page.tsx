@@ -108,11 +108,11 @@ export default async function WatchlistDetailPage({
     ? activeItems.filter((item) => hasPromo(item))
     : activeItems;
 
-  const promoCount = rawItems.filter((item) => hasPromo(item)).length;
-  const bestBuyCount = rawItems.filter(
+  const promoCount = activeItems.filter((item) => hasPromo(item)).length;
+  const bestBuyCount = activeItems.filter(
     (item) => item.current_status === "best_buy",
   ).length;
-  const highPriceCount = rawItems.filter(
+  const highPriceCount = activeItems.filter(
     (item) => item.current_status === "high_price",
   ).length;
 
@@ -179,7 +179,7 @@ export default async function WatchlistDetailPage({
             Total produse
           </div>
           <div className="mt-2 text-2xl font-semibold text-white">
-            {rawItems.length}
+            {activeItems.length}
           </div>
         </div>
 
@@ -244,12 +244,12 @@ export default async function WatchlistDetailPage({
           <p className="text-lg font-semibold text-white">
             {promoOnly
               ? "Nu există promoții active în această listă"
-              : "Nu există produse în această listă"}
+              : "Nu există produse active în această listă"}
           </p>
           <p className="mt-2 text-sm text-slate-400">
             {promoOnly
               ? "Revino la toate produsele sau importă oferte Freshful."
-              : "Importă produse Freshful pentru a începe urmărirea."}
+              : "Importă produse Freshful sau reactivează produse ascunse."}
           </p>
         </div>
       ) : (
