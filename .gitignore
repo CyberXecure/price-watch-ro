@@ -1,0 +1,120 @@
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+.vscode/
+.idea/
+
+# =========================
+# Node / Next.js
+# =========================
+node_modules/
+.next/
+out/
+dist/
+build/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Turbopack / cache
+.turbo/
+.cache/
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+.venv/
+venv/
+env/
+ENV/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# =========================
+# FastAPI / runtime / logs
+# =========================
+*.log
+logs/
+tmp/
+temp/
+
+# =========================
+# SQLite / local databases
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+
+# Keep example/config docs tracked
+!.env.example
+
+# =========================
+# Environment / secrets
+# =========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# =========================
+# Generated files / archives
+# =========================
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+
+# =========================
+# Binary / packaging artifacts
+# =========================
+*.exe
+*.msi
+*.dll
+*.pyd
+*.so
+*.dylib
+
+# =========================
+# Test / coverage artifacts
+# =========================
+coverage/
+reports/
+
+# =========================
+# Playwright / browser / screenshots
+# =========================
+playwright-report/
+test-results/
+screenshots/
+
+# =========================
+# Project-specific temporary files
+# =========================
+*.tmp
+*.bak
+*.old
+*.orig
+
+# Project-specific local runtime data
+services/api/.venv/
+services/api/freshful_profile/
+services/api/*.db
+services/api/*.db.backup.*
+
