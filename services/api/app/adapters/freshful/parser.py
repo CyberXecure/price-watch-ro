@@ -67,6 +67,7 @@ def extract_brand_from_url(url: str) -> Optional[str]:
         "flori", "diverse", "culori", "grill", "de", "din", "superioare", "dezosate",
         "proaspat", "proaspăt", "proaspete", "kg", "g", "l", "ml", "buc", "fire",
         "limonada", "limonadă", "cu", "lamaie", "lămâie", "verde", "zmeura", "zmeură",
+        "eco",
     }
 
     brand_parts: list[str] = []
@@ -185,7 +186,6 @@ def infer_measure_from_package(package_text: Optional[str]) -> tuple[str, Option
         raw = raw.strip()
 
         if count_mode:
-            # pentru count, 20.000 înseamnă 20000, nu 20.0
             if "." in raw and "," not in raw:
                 raw = raw.replace(".", "")
             else:
@@ -308,7 +308,9 @@ def extract_brand_and_product_from_json_ld(candidates: list[dict[str, Any]]) -> 
 
             offers = item.get("offers")
             if isinstance(offers, dict):
-                data["price_total"] = data.get("price_total") or parse_price_string(str(offers.get("price")))
+                json_ld_price = parse_price_string(str(offers.get("price")))
+                if json_ld_price is not None:
+                    data["json_ld_price_total"] = json_ld_price
                 data["currency"] = data.get("currency") or offers.get("priceCurrency")
 
     return data
@@ -373,6 +375,7 @@ def infer_brand_from_title(title: Optional[str]) -> Optional[str]:
         "iaurt", "apă", "apa", "ulei", "pâine", "paine", "brânză",
         "branza", "cașcaval", "cascaval", "detergent", "scutece",
         "bețișoare", "betisoare", "buchet", "limonadă", "limonada",
+        "lămâi", "lamai",
     }
 
     if first_word.lower() in blocked:
@@ -410,7 +413,7 @@ def extract_package_text(text: str) -> Optional[str]:
 
 def extract_main_product_text(soup: BeautifulSoup) -> str:
     selectors = [
-        'main',
+        "main",
         '[data-testid="product-details"]',
         '[data-testid="product-page"]',
         '[data-testid="product-main"]',
@@ -432,7 +435,6 @@ def extract_main_product_text(soup: BeautifulSoup) -> str:
                 chunks.append(text)
 
     if chunks:
-        # luăm cel mai lung bloc relevant
         return max(chunks, key=len)
 
     return clean_text(soup.get_text(" ", strip=True)) or ""
@@ -441,17 +443,20 @@ def extract_main_product_text(soup: BeautifulSoup) -> str:
 def extract_prices_from_text(text: str) -> list[float]:
     values: list[float] = []
 
-    for match in re.finditer(r"(\d+(?:[.,]\d{1,2})?)\s*Lei", text, re.IGNORECASE):
+    for match in re.finditer(
+        r"(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc))",
+        text,
+        re.IGNORECASE,
+    ):
         raw_value = match.group(1)
         try:
             value = float(raw_value.replace(",", "."))
         except ValueError:
             continue
 
-        start = max(0, match.start() - 12)
+        start = max(0, match.start() - 16)
         prefix = text[start:match.start()]
 
-        # exclude explicit +X Lei
         if "+" in prefix:
             continue
 
@@ -461,16 +466,43 @@ def extract_prices_from_text(text: str) -> list[float]:
     return values
 
 
+def extract_primary_offer_prices(text: str) -> tuple[Optional[float], Optional[float]]:
+    normalized = re.sub(r"\s+", " ", text).strip()
+
+    patterns = [
+        r"(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc)).{0,80}?(?:Economisești|economisești)\s*\d+(?:[.,]\d+)?\s*%.{0,80}?(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc))",
+        r"(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc)).{0,80}?-\s*\d+(?:[.,]\d+)?\s*%.{0,80}?(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc))",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, normalized, re.IGNORECASE)
+        if not match:
+            continue
+
+        old_price = parse_price_string(match.group(1))
+        current_price = parse_price_string(match.group(2))
+
+        if (
+            current_price is not None
+            and old_price is not None
+            and old_price > current_price
+        ):
+            return current_price, old_price
+
+    return None, None
+
+
 def select_current_and_old_price(
     text: str,
     discount_percent: Optional[float],
 ) -> tuple[Optional[float], Optional[float]]:
+    primary_current, primary_old = extract_primary_offer_prices(text)
+    if primary_current is not None:
+        return primary_current, primary_old
+
     candidates = sorted(set(extract_prices_from_text(text)))
     if not candidates:
         return None, None
-
-    current_price: Optional[float] = None
-    old_price: Optional[float] = None
 
     if discount_percent is not None and 0 < discount_percent < 100:
         best_pair: tuple[float, float] | None = None
@@ -491,7 +523,6 @@ def select_current_and_old_price(
         if best_pair and best_error <= 8:
             return best_pair
 
-    # fallback simplu
     if len(candidates) == 1:
         return candidates[0], None
 
@@ -549,10 +580,13 @@ def parse_freshful_product_html(html: str, url: str) -> dict[str, Any]:
     if selected_old is not None:
         data["old_price"] = selected_old
 
+    if data.get("price_total") is None and data.get("json_ld_price_total") is not None:
+        data["price_total"] = data.get("json_ld_price_total")
+
     if data.get("price_total") is None:
         price_candidate = find_first_text_matching(
             [
-                r"(\d+(?:[.,]\d{1,2})\s*lei)",
+                r"(\d+(?:[.,]\d{1,2})\s*lei(?!\s*/\s*(?:l|kg|buc)))",
                 r"(\d+(?:[.,]\d{1,2})\s*RON)",
             ],
             product_text or full_text,
@@ -592,7 +626,6 @@ def parse_freshful_product_html(html: str, url: str) -> dict[str, Any]:
     final_unit_price_value = validated_unit_price_value
     final_unit_price_unit = validated_unit_price_unit
 
-    # dacă există promo, derivăm din prețul curent real
     if measure_value is not None and measure_value > 0 and data.get("price_total") is not None:
         if data.get("discount_percent") is not None or final_unit_price_value is None:
             derived_value, derived_unit = derive_unit_price_from_package(
@@ -666,7 +699,7 @@ def debug_freshful_product_html(html: str, url: str) -> dict[str, Any]:
         "brand_from_url": extract_brand_from_url(url),
         "text_price_match": find_first_text_matching(
             [
-                r"(\d+(?:[.,]\d{1,2})\s*lei)",
+                r"(\d+(?:[.,]\d{1,2})\s*lei(?!\s*/\s*(?:l|kg|buc)))",
                 r"(\d+(?:[.,]\d{1,2})\s*RON)",
             ],
             product_text or full_text,
