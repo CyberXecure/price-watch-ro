@@ -48,7 +48,7 @@ export default function WatchlistItemActions({
       });
 
       if (!response.ok) {
-        let detail = "Refresh failed";
+        let detail = "Actualizarea a eșuat";
         try {
           const data = await response.json();
           detail = data?.detail || detail;
@@ -58,7 +58,7 @@ export default function WatchlistItemActions({
 
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Refresh failed");
+      setError(err instanceof Error ? err.message : "Actualizarea a eșuat");
     } finally {
       setIsRefreshing(false);
       setIsRefreshingRendered(false);
@@ -67,6 +67,10 @@ export default function WatchlistItemActions({
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        Acțiuni
+      </div>
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -94,6 +98,10 @@ export default function WatchlistItemActions({
         >
           Deschide
         </a>
+      </div>
+
+      <div className="text-[11px] leading-5 text-slate-500">
+        Actualizarea promo necesită Chrome pornit cu remote debugging pe portul 9222.
       </div>
 
       <WatchlistItemActiveToggle

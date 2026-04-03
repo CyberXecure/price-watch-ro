@@ -221,7 +221,7 @@ export default async function WatchlistDetailPage({
         </div>
 
         <div className="text-sm text-slate-400">
-          Sortare: promoțiile apar primele
+          Promoțiile apar primele
         </div>
       </div>
 
@@ -246,7 +246,7 @@ export default async function WatchlistDetailPage({
                 <tr>
                   <th className="p-3 font-medium">Produs</th>
                   <th className="p-3 font-medium">Preț</th>
-                  <th className="p-3 font-medium">Comparație</th>
+                  <th className="p-3 font-medium">Preț unitar</th>
                   <th className="p-3 font-medium">Țintă</th>
                   <th className="p-3 font-medium">Status</th>
                   <th className="p-3 font-medium">Acțiuni</th>
@@ -360,7 +360,7 @@ export default async function WatchlistDetailPage({
                           item.latest_unit_price_value !== undefined &&
                           item.latest_unit_price_unit ? (
                             <div className="text-xs text-slate-400">
-                              unitar: {formatNumeric(item.latest_unit_price_value)} lei/
+                              Preț unitar: {formatNumeric(item.latest_unit_price_value)} lei/
                               {item.latest_unit_price_unit}
                             </div>
                           ) : null}
@@ -386,7 +386,7 @@ export default async function WatchlistDetailPage({
 
                           {itemHasPromo ? (
                             <span className="inline-flex rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200">
-                              ofertă activă
+                              Promo activ
                             </span>
                           ) : null}
                         </div>

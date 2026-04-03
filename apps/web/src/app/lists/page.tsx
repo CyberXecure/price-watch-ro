@@ -10,8 +10,8 @@ export default async function ListsPage() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold tracking-tight text-white">Liste</h1>
         <p className="mt-2 text-slate-400">
-          Creează oricâte liste vrei, cu denumiri proprii, și urmărește starea
-          produselor într-un dashboard dark premium.
+          Creează liste cu denumiri proprii și urmărește rapid produsele,
+          promoțiile și prețurile țintă.
         </p>
       </div>
 
@@ -38,7 +38,7 @@ export default async function ListsPage() {
                 <div>
                   <h2 className="text-xl font-semibold text-white">{list.name}</h2>
                   <p className="mt-1 text-sm text-slate-400">
-                    {list.total_items} produse
+                    {list.total_items} produse urmărite
                   </p>
                 </div>
 
