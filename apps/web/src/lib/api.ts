@@ -131,3 +131,36 @@ export async function updateWatchlistItem(
     body: JSON.stringify(payload),
   });
 }
+
+export async function importFreshfulUrl(payload: {
+  watchlistId: number;
+  url: string;
+  targetPrice?: number | null;
+  targetUnit?: string | null;
+}) {
+  const params = new URLSearchParams({
+    url: payload.url,
+    watchlist_id: String(payload.watchlistId),
+  });
+
+  if (payload.targetPrice !== null && payload.targetPrice !== undefined) {
+    params.set("target_price", String(payload.targetPrice));
+  }
+
+  if (payload.targetUnit) {
+    params.set("target_unit", payload.targetUnit);
+  }
+
+  return apiFetch(`/imports/freshful-url-auto?${params.toString()}`, {
+    method: "POST",
+  });
+}
+
+export async function archiveWatchlistItem(
+  watchlistId: number,
+  itemId: number,
+) {
+  return updateWatchlistItem(watchlistId, itemId, {
+    is_active: false,
+  });
+}

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import WatchlistItemActiveToggle from "@/components/watchlist-item-active-toggle";
+import { archiveWatchlistItem } from "@/lib/api";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://127.0.0.1:8000";
@@ -23,6 +24,7 @@ export default function WatchlistItemActions({
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRefreshingRendered, setIsRefreshingRendered] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function runRefresh(mode: "static" | "rendered") {
@@ -65,6 +67,24 @@ export default function WatchlistItemActions({
     }
   }
 
+  async function handleArchive() {
+    const confirmed = window.confirm(
+      "Ascunzi acest produs din lista activă?",
+    );
+    if (!confirmed) return;
+
+    try {
+      setError(null);
+      setIsArchiving(true);
+      await archiveWatchlistItem(watchlistId, itemId);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Acțiunea a eșuat");
+    } finally {
+      setIsArchiving(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
@@ -75,7 +95,7 @@ export default function WatchlistItemActions({
         <button
           type="button"
           onClick={() => runRefresh("static")}
-          disabled={isRefreshing || isRefreshingRendered}
+          disabled={isRefreshing || isRefreshingRendered || isArchiving}
           className="rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-200 transition hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isRefreshing ? "Actualizez..." : "Actualizează"}
@@ -84,7 +104,7 @@ export default function WatchlistItemActions({
         <button
           type="button"
           onClick={() => runRefresh("rendered")}
-          disabled={isRefreshing || isRefreshingRendered}
+          disabled={isRefreshing || isRefreshingRendered || isArchiving}
           className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1.5 text-xs font-medium text-fuchsia-200 transition hover:bg-fuchsia-500/20 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isRefreshingRendered ? "Actualizez promo..." : "Actualizează promo"}
@@ -98,6 +118,17 @@ export default function WatchlistItemActions({
         >
           Deschide
         </a>
+
+        {isActive ? (
+          <button
+            type="button"
+            onClick={handleArchive}
+            disabled={isRefreshing || isRefreshingRendered || isArchiving}
+            className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isArchiving ? "Ascund..." : "Ascunde"}
+          </button>
+        ) : null}
       </div>
 
       <div className="text-[11px] leading-5 text-slate-500">

@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import EditableTargetPrice from "@/components/editable-target-price";
 import WatchlistItemActions from "@/components/watchlist-item-actions";
+import { FreshfulImportForm } from "@/components/ui/FreshfulImportForm";
 import {
   getWatchlist,
   getWatchlistDetailedItems,
@@ -101,9 +102,11 @@ export default async function WatchlistDetailPage({
     return bTs - aTs;
   });
 
+  const activeItems = sortedItems.filter((item) => item.is_active);
+
   const visibleItems = promoOnly
-    ? sortedItems.filter((item) => hasPromo(item))
-    : sortedItems;
+    ? activeItems.filter((item) => hasPromo(item))
+    : activeItems;
 
   const promoCount = rawItems.filter((item) => hasPromo(item)).length;
   const bestBuyCount = rawItems.filter(
@@ -154,6 +157,19 @@ export default async function WatchlistDetailPage({
               </Link>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-white">Importă produse</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Adaugă în această listă produse Freshful pentru monitorizare.
+            </p>
+          </div>
+
+          <FreshfulImportForm watchlistId={watchlistId} />
         </div>
       </div>
 
@@ -220,9 +236,7 @@ export default async function WatchlistDetailPage({
           </Link>
         </div>
 
-        <div className="text-sm text-slate-400">
-          Promoțiile apar primele
-        </div>
+        <div className="text-sm text-slate-400">Promoțiile apar primele</div>
       </div>
 
       {visibleItems.length === 0 ? (
