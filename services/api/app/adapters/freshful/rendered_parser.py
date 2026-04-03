@@ -393,20 +393,16 @@ def parse_freshful_product_rendered(url: str) -> dict:
 
             rendered = detect_rendered_price_block(page)
         except PlaywrightTimeoutError as exc:
-            try:
-                page.close()
-            except Exception:
-                pass
             raise ValueError(f"Rendered parser timeout for Freshful page: {exc}") from exc
         finally:
             try:
                 page.close()
             except Exception:
                 pass
-            try:
-                browser.close()
-            except Exception:
-                pass
+            # IMPORTANT:
+            # Nu închidem browserul conectat prin CDP.
+            # Browserul este un Chrome extern pornit separat cu remote debugging.
+            # browser.close() poate arunca NotImplementedError în acest scenariu.
 
     title = clean_product_title(rendered.get("title"))
     brand = clean_text(rendered.get("brand")) or extract_brand_from_url(url) or infer_brand_from_title(title)
