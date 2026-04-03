@@ -346,7 +346,10 @@ def refresh_watchlist_item(
         static_parsed = parse_freshful_product_html(html, product.url)
 
         payload = _build_payload_from_parsed(static_parsed, watchlist_id, item)
-        upsert_result = upsert_product_snapshot_and_watchlist(payload=payload, session=session)
+        upsert_result = upsert_product_snapshot_and_watchlist(
+            payload=payload,
+            session=session,
+        )
 
         return _build_refresh_response(
             session=session,
@@ -402,7 +405,10 @@ def refresh_watchlist_item_rendered(
             )
 
         payload = _build_payload_from_parsed(rendered_parsed, watchlist_id, item)
-        upsert_result = upsert_product_snapshot_and_watchlist(payload=payload, session=session)
+        upsert_result = upsert_product_snapshot_and_watchlist(
+            payload=payload,
+            session=session,
+        )
 
         return _build_refresh_response(
             session=session,
