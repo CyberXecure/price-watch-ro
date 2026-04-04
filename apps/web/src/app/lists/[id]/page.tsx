@@ -11,7 +11,7 @@ import {
   
 type PageProps = {  
   params: Promise<{ id: string }>;  
-  searchParams?: Promise<{ promo?: string }>;  
+  searchParams?: Promise<{ promo?: string; view?: string }>;  
 };  
   
 function formatPrice(value: number | null | undefined): string {  
@@ -94,6 +94,7 @@ export default async function WatchlistDetailPage({
   const resolvedSearchParams = searchParams ? await searchParams : {};  
   const watchlistId = Number(id);  
   const promoOnly = resolvedSearchParams?.promo === "1";  
+  const view = resolvedSearchParams?.view || "active";  
   
   if (Number.isNaN(watchlistId)) {  
     throw new Error("Invalid watchlist id");  
@@ -122,16 +123,24 @@ export default async function WatchlistDetailPage({
   });  
   
   const activeItems = sortedItems.filter((item) => item.is_active);  
+  const hiddenItems = sortedItems.filter((item) => !item.is_active);  
+  
+  const sourceItems =  
+    view === "hidden"  
+      ? hiddenItems  
+      : view === "all"  
+        ? sortedItems  
+        : activeItems;  
   
   const visibleItems = promoOnly  
-    ? activeItems.filter((item) => hasPromo(item))  
-    : activeItems;  
+    ? sourceItems.filter((item) => hasPromo(item))  
+    : sourceItems;  
   
-  const promoCount = activeItems.filter((item) => hasPromo(item)).length;  
-  const bestBuyCount = activeItems.filter(  
+  const promoCount = sourceItems.filter((item) => hasPromo(item)).length;  
+  const bestBuyCount = sourceItems.filter(  
     (item) => item.current_status === "best_buy",  
   ).length;  
-  const highPriceCount = activeItems.filter(  
+  const highPriceCount = sourceItems.filter(  
     (item) => item.current_status === "high_price",  
   ).length;  
   
@@ -198,7 +207,7 @@ export default async function WatchlistDetailPage({
             Total produse  
           </div>  
           <div className="mt-2 text-2xl font-semibold text-white">  
-            {activeItems.length}  
+            {sourceItems.length}  
           </div>  
         </div>  
   
@@ -233,10 +242,32 @@ export default async function WatchlistDetailPage({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">  
         <div className="flex flex-wrap gap-2">  
           <Link  
-            href={basePath}  
+            href={`${basePath}?view=active${promoOnly ? "&promo=1" : ""}`}  
             className={`rounded-full border px-4 py-2 text-sm transition ${  
-              !promoOnly  
+              view === "active"  
                 ? "border-white/10 bg-white/10 text-white"  
+                : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"  
+            }`}  
+          >  
+            Active  
+          </Link>  
+  
+          <Link  
+            href={`${basePath}?view=hidden${promoOnly ? "&promo=1" : ""}`}  
+            className={`rounded-full border px-4 py-2 text-sm transition ${  
+              view === "hidden"  
+                ? "border-amber-400/20 bg-amber-500/10 text-amber-200"  
+                : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"  
+            }`}  
+          >  
+            Ascunse  
+          </Link>  
+  
+          <Link  
+            href={`${basePath}?view=all${promoOnly ? "&promo=1" : ""}`}  
+            className={`rounded-full border px-4 py-2 text-sm transition ${  
+              view === "all"  
+                ? "border-blue-400/20 bg-blue-500/10 text-blue-200"  
                 : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"  
             }`}  
           >  
@@ -244,7 +275,18 @@ export default async function WatchlistDetailPage({
           </Link>  
   
           <Link  
-            href={`${basePath}?promo=1`}  
+            href={`${basePath}?view=${view}`}  
+            className={`rounded-full border px-4 py-2 text-sm transition ${  
+              !promoOnly  
+                ? "border-white/10 bg-white/10 text-white"  
+                : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"  
+            }`}  
+          >  
+            Fără filtru promo  
+          </Link>  
+  
+          <Link  
+            href={`${basePath}?view=${view}&promo=1`}  
             className={`rounded-full border px-4 py-2 text-sm transition ${  
               promoOnly  
                 ? "border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-200"  
@@ -262,13 +304,19 @@ export default async function WatchlistDetailPage({
         <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.2)]">  
           <p className="text-lg font-semibold text-white">  
             {promoOnly  
-              ? "Nu există promoții active în această listă"  
-              : "Nu există produse active în această listă"}  
+              ? "Nu există promoții pentru filtrul selectat"  
+              : view === "hidden"  
+                ? "Nu există produse ascunse în această listă"  
+                : view === "all"  
+                  ? "Nu există produse în această listă"  
+                  : "Nu există produse active în această listă"}  
           </p>  
           <p className="mt-2 text-sm text-slate-400">  
             {promoOnly  
-              ? "Revino la toate produsele sau importă oferte Freshful."  
-              : "Importă produse Freshful sau reactivează produse ascunse."}  
+              ? "Revino la toate produsele sau schimbă filtrul."  
+              : view === "hidden"  
+                ? "Produsele ascunse pot fi reactivate din această secțiune."  
+                : "Importă produse Freshful sau schimbă filtrul curent."}  
           </p>  
         </div>  
       ) : (  
@@ -420,6 +468,12 @@ export default async function WatchlistDetailPage({
                           {itemHasPromo ? (  
                             <span className="inline-flex rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200">  
                               Promo activ  
+                            </span>  
+                          ) : null}  
+  
+                          {!item.is_active ? (  
+                            <span className="inline-flex rounded-full border border-slate-400/20 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">  
+                              Ascuns  
                             </span>  
                           ) : null}  
                         </div>  
