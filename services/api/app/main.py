@@ -1,3 +1,6 @@
+import asyncio
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,6 +12,9 @@ from app.routers.demo import router as demo_router
 from app.routers.imports import router as imports_router
 from app.routers.products import router as products_router
 from app.routers.watchlists import router as watchlists_router
+
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 app = FastAPI(title=API_TITLE)
 
