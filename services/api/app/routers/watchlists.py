@@ -12,6 +12,8 @@ from app.models import PriceSnapshot, StoreProduct, Watchlist, WatchlistItem
 from app.routers.imports import fetch_html, upsert_product_snapshot_and_watchlist
 from app.schemas import FreshfulImportRequest
 
+import traceback
+
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
 
 
@@ -364,7 +366,10 @@ def refresh_watchlist_item(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Refresh failed: {exc}") from exc
+        raise HTTPException(
+            status_code=400,
+            detail="Rendered refresh failed:\n" + traceback.format_exc(),
+        ) from exc
 
 
 @router.post("/{watchlist_id}/items/{item_id}/refresh-rendered")

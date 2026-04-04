@@ -1,3 +1,6 @@
+import asyncio
+import sys
+
 import re
 from typing import Optional
 
@@ -11,6 +14,9 @@ from app.adapters.freshful.parser import (
     infer_brand_from_title,
     infer_measure_from_package,
 )
+
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 CDP_URL = "http://127.0.0.1:9222"
 
