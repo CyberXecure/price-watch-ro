@@ -1,43 +1,56 @@
-
----
-
-## 2 `BETA-CHECKLIST.md`
-
-Fișier:
-`D:\dev\projects\price-watch-ro\BETA-CHECKLIST.md`
-
-```md id="42102"
-# Beta checklist
-
-## Backend
-- [ ] API pornește fără erori
-- [ ] `http://127.0.0.1:8000/health` răspunde
-- [ ] `http://127.0.0.1:8000/dashboard/summary` răspunde
-- [ ] `http://127.0.0.1:8000/watchlists/1/items/detailed` răspunde
-
-## Frontend
-- [ ] frontend pornește fără erori
-- [ ] `/lists` se încarcă
-- [ ] `/lists/1` se încarcă
-- [ ] target price se poate edita
-- [ ] activ / inactiv funcționează
-- [ ] refresh static funcționează
-
-## Promo rendered flow
-- [ ] Chrome CDP răspunde pe `9222`
-- [ ] sesiunea Freshful este activă în Chrome debug
-- [ ] `refresh-rendered-item.ps1` rulează fără erori
-- [ ] itemul promo se actualizează în DB/API
-- [ ] UI afișează snapshotul promo nou
-
-## Validare minimă produs promo
-- [ ] `latest_price_total` corect
-- [ ] `latest_old_price` corect
-- [ ] `latest_promo_label` corect
-- [ ] `latest_discount_percent` corect
-- [ ] `latest_captured_at` nou
-
-## Oprire
-- [ ] `stop-dev.ps1` oprește API
-- [ ] `stop-dev.ps1` oprește frontend
-- [ ] `stop-dev.ps1` oprește Chrome debug, dacă este cazul
+---  
+  
+## `BETA-CHECKLIST.md`  
+  
+```md id="30893"  
+# BETA CHECKLIST — price-watch-ro  
+  
+## Regula etapei curente  
+  
+Scop curent:  
+- packaging beta  
+- cleanup minim  
+- polish final UI  
+- fără reluarea debugging-ului vechi, în afara bugurilor reale blocate  
+  
+---  
+  
+## 1. Repo / structură  
+  
+- [ ] Repo Git inițializat  
+- [ ] `apps/web` este folder normal în repo, nu embedded repo  
+- [ ] `.gitignore` valid  
+- [ ] `.env.example` valid  
+- [ ] `docs/` există  
+- [ ] `docs/price-watch-ro-beta-docs.docx` există  
+- [ ] `README-beta.md` există  
+- [ ] `BETA-CHECKLIST.md` există  
+- [ ] `start-dev.ps1` există  
+- [ ] `stop-dev.ps1` există  
+- [ ] `refresh-rendered-item.ps1` există  
+  
+---  
+  
+## 2. Curățenie minimă  
+  
+- [ ] `.venv` este ignorat  
+- [ ] baze SQLite locale sunt ignorate  
+- [ ] `freshful_profile` / profilul Chrome local este ignorat  
+- [ ] logurile și cache-urile nu intră în repo  
+- [ ] nu există fișiere temporare inutile în root  
+- [ ] nu există scripturi duplicate inutile în root  
+  
+---  
+  
+## 3. Pornire locală  
+  
+- [ ] `start-dev.ps1` rulează fără erori critice  
+- [ ] API pornește pe `127.0.0.1:8000`  
+- [ ] frontend pornește pe `localhost:3000`  
+- [ ] `stop-dev.ps1` oprește procesele relevante  
+- [ ] `GET /health` răspunde corect  
+  
+Test rapid:  
+  
+```powershell  
+curl.exe http://127.0.0.1:8000/health  
