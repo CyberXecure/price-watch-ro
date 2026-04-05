@@ -1,157 +1,141 @@
-# price-watch-ro
+# price-watch-ro / Chilipir
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+Aplicație local-first pentru liste și alerte de preț, construită în jurul ideii de monitorizare simplă a produselor și a variațiilor de preț.
 
-**Chilipir** — aplicație local-first pentru liste și alerte de preț pentru Freshful, construită cu **FastAPI**, **Next.js** și **SQLite**.
+Chilipir este brandingul folosit pentru MVP-ul orientat pe liste, watchlists și refresh local al datelor.
 
-> Status: beta locală freeze-ready, curățată pentru open-source. Repository-ul nu urmărește reluarea debugging-ului beta.
+## Status
 
-## Overview
+Proiectul este în stadiu beta / MVP.
 
-`price-watch-ro` este un proiect local-first pentru urmărirea produselor Freshful într-o formă simplă și practică.
+Repository-ul public reflectă structura reală a proiectului și workflow-ul local folosit în dezvoltare. În forma actuală, focusul este pe rulare locală, testare manuală și iterație rapidă.
 
-Stare funcțională actuală:
+## Scope curent
 
-- import Freshful funcțional
-- refresh static funcțional
-- refresh promo/rendered funcțional cu Chrome remote debugging pe portul `9222`
-- target price funcțional
-- filtre funcționale: active / ascunse / toate
-- stocare locală în SQLite
+În starea actuală, proiectul include:
+- frontend web în Next.js
+- backend API în FastAPI
+- watchlists și refresh-uri pentru produse
+- scripturi locale pentru pornire și oprire rapidă
+- workflow local pentru dezvoltare și testare
 
-Scopul actual este un MVP curat, simplu și reproductibil pentru rulare locală.
+## Stack
 
-## Current scope
-
-Scope-ul actual al proiectului este:
-
-- **Freshful only**
-- **local-first**
-- **FastAPI + Next.js + SQLite**
-- fără infrastructură cloud obligatorie
-- fără complexitate inutilă
-- refresh rendered bazat pe o sesiune locală Chrome expusă pe `9222`
-
-## Tech stack
-
-- **Backend:** FastAPI
-- **Frontend:** Next.js
-- **Database:** SQLite
-- **Rendered refresh:** Chrome / Chromium remote debugging
-- **Primary target:** rulare locală
+- Frontend: Next.js
+- Backend: FastAPI
+- Limbaj principal backend: Python
+- Limbaj principal frontend: TypeScript / React
+- Bază de date: workflow local, orientat pe rulare standalone
+- Tooling local: PowerShell, Chrome remote debugging
 
 ## Repository structure
 
-```text
-price-watch-ro/
-├─ apps/
-│  └─ web/
-├─ services/
-│  └─ api/
-├─ scripts/
-│  └─ dev/
-│     ├─ start-local.ps1
-│     └─ stop-local.ps1
-├─ .env.example
-├─ .gitignore
-├─ LICENSE
-└─ README.md
-```
+apps/
+  web/               frontend-ul web
 
-## Requirements
+services/
+  api/               backend-ul FastAPI
 
-Pentru rulare locală:
+scripts/
+  dev/               scripturi locale pentru start/stop
 
-- Python 3.12+
-- Node.js 20+
-- npm
-- Google Chrome sau Chromium
-- Windows PowerShell
+README.md
+LICENSE
+.env.example
 
 ## Quick start
 
-### 1. Backend
+### Workflow recomandat (Windows PowerShell)
 
-```powershell
-cd services/api
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-```
+Din rădăcina repository-ului:
 
-API-ul pornește implicit la:
+.\scripts\dev\start-local.ps1
 
-```text
-http://127.0.0.1:8000
-```
+Scriptul încearcă să:
+- pornească Google Chrome cu remote debugging pe portul 9222
+- pornească API-ul local la http://127.0.0.1:8000
+- pornească frontend-ul local la http://localhost:3000
 
-### 2. Frontend
+Pentru oprire:
 
-```powershell
-cd apps/web
+.\scripts\dev\stop-local.ps1
+
+## Frontend only
+
+Pentru pornirea doar a frontend-ului:
+
+cd .\apps\web
 npm install
 $env:NEXT_PUBLIC_API_BASE="http://127.0.0.1:8000"
 npm run dev
-```
 
 Frontend-ul pornește implicit la:
 
-```text
 http://localhost:3000
-```
 
-### 3. Chrome pentru rendered refresh
+## Chrome pentru rendered refresh
 
-```powershell
+În anumite flow-uri locale poate fi necesar Chrome cu remote debugging activ.
+
+Pornire manuală exemplu:
+
 & "C:\Program Files\Google\Chrome\Application\chrome.exe" `
   --remote-debugging-port=9222 `
   --user-data-dir="$env:TEMP\price-watch-ro-chrome"
-```
 
-### 4. Scripturi helper
+## Variabile de mediu
 
-Din rădăcina repo-ului:
+Repository-ul conține un fișier .env.example.
 
-```powershell
-.\scripts\dev\start-local.ps1
-.\scripts\dev\stop-local.ps1
-```
+Exemplu de variabilă folosită de frontend:
+
+NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000
+
+## Important note about backend bootstrap
+
+Repository-ul public păstrează backend-ul și structura reală a proiectului, dar în forma actuală nu publică încă un manifest dedicat de dependențe pentru un bootstrap complet, de la zero, al backend-ului într-un clone nou.
+
+Asta înseamnă:
+- codul backend este prezent în repository
+- workflow-ul local existent este documentat
+- documentația pentru instalarea standalone complet reproductibilă a backend-ului trebuie aliniată într-un commit separat, odată cu publicarea manifestului de dependențe corespunzător
+
+Cu alte cuvinte, repo-ul este public și util ca structură, context, cod și workflow local, dar onboarding-ul backend pentru un mediu complet nou nu este încă finalizat la nivel de packaging.
 
 ## Notes
 
-- proiectul folosește **SQLite** pentru simplitate și portabilitate locală
-- fișierele locale de bază de date nu trebuie comise în Git
-- refresh-ul rendered depinde de o sesiune locală Chrome disponibilă pe `9222`
-- repository-ul urmărește o structură minimă și clară
+- proiectul este gândit în primul rând pentru rulare locală
+- unele flow-uri depind de un mediu local deja pregătit
+- scripturile din scripts/dev sunt orientate pe workflow-ul curent de dezvoltare
+- stop-local.ps1 poate opri procese care folosesc porturile locale relevante proiectului
 
-## What is intentionally not included
+## Limitări
 
-În forma actuală, repository-ul nu urmărește:
-
-- deploy cloud
-- multi-store production support
-- infrastructură complexă
-- documentarea etapelor vechi de debugging beta
+În starea actuală:
+- proiectul este orientat spre uz local și testare beta
+- documentația de bootstrap complet pentru backend nu este încă finalizată
+- pot exista zone în curs de refactorizare sau polish
+- unele funcționalități sunt optimizate pentru mediul local al dezvoltatorului
 
 ## Legal
 
-Acest proiect este:
+Acest proiect este distribuit sub licența MIT. Vezi fișierul LICENSE pentru detalii.
 
-- **neoficial**
-- **neafiliat** cu Freshful sau cu proprietarii mărcilor asociate
-- publicat exclusiv în scop de dezvoltare software, testare locală și studiu tehnic
+## Disclaimer
 
-Toate mărcile, denumirile comerciale și numele produselor aparțin proprietarilor lor legitimi.
+Acest proiect este un proiect independent și experimental.
 
-Utilizarea proiectului trebuie făcută responsabil și în conformitate cu termenii aplicabili platformelor terțe folosite.
+Nu este afiliat oficial cu magazine, platforme comerciale sau servicii terțe care pot apărea în logica aplicației, în exemple sau în fluxurile de testare.
 
-## AI assistance disclaimer
+Utilizarea proiectului și adaptarea lui pentru alte surse, fluxuri sau scopuri rămân responsabilitatea utilizatorului.
 
-Ideea proiectului, direcția produsului și deciziile funcționale aparțin autorului repository-ului.
+## AI assistance disclosure
 
-Părți din arhitectură, implementare, refactorizare și documentație au fost generate sau accelerate cu ajutor AI. Tot conținutul trebuie revizuit și validat de autor înainte de utilizare în medii reale sau publice.
+Ideea, direcția produsului și deciziile de selecție aparțin autorului proiectului.
 
-## License
+Arhitectura, implementarea și documentația au fost realizate cu asistență AI, în diferite etape ale dezvoltării. Codul publicat a fost selectat, ajustat și integrat în proiect de autor.
 
-Acest proiect este licențiat sub **MIT License**. Vezi fișierul [LICENSE](LICENSE).
+## Author
+
+Laurentiu Iulian Iancu
+a.k.a. CyberXecure
