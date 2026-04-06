@@ -1,5 +1,9 @@
 # price-watch-ro / Chilipir
 
+[![Release](https://img.shields.io/github/v/release/CyberXecure/price-watch-ro?display_name=tag)](https://github.com/CyberXecure/price-watch-ro/releases)
+[![License](https://img.shields.io/github/license/CyberXecure/price-watch-ro)](https://github.com/CyberXecure/price-watch-ro/blob/main/LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/CyberXecure/price-watch-ro)](https://github.com/CyberXecure/price-watch-ro/commits/main)
+
 Aplicație local-first pentru liste și alerte de preț, construită în jurul ideii de monitorizare simplă a produselor și a variațiilor de preț.
 
 Chilipir este brandingul folosit pentru MVP-ul orientat pe liste, watchlists și refresh local al datelor.
