@@ -89,13 +89,13 @@ Pornire manuală exemplu:
 
 ## Screenshots
 
-### Dashboard
+### Lists overview
 
-![Dashboard](docs/images/screenshot-dashboard.png)
+![Lists overview](docs/images/screenshot-dashboard.png)
 
-### Watchlist
+### Watchlist details
 
-![Watchlist](docs/images/screenshot-watchlist.png)
+![Watchlist details](docs/images/screenshot-watchlist.png)
 
 ## Variabile de mediu
 
