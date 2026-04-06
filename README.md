@@ -83,6 +83,16 @@ Pornire manuală exemplu:
   --remote-debugging-port=9222 `
   --user-data-dir="$env:TEMP\price-watch-ro-chrome"
 
+## Screenshots
+
+### Dashboard
+
+![Dashboard](docs/images/screenshot-dashboard.png)
+
+### Watchlist
+
+![Watchlist](docs/images/screenshot-watchlist.png)
+
 ## Variabile de mediu
 
 Repository-ul conține un fișier .env.example.
