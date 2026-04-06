@@ -153,3 +153,4 @@ Arhitectura, implementarea și documentația au fost realizate cu asistență AI
 
 Laurentiu Iulian Iancu
 a.k.a. CyberXecure
+
