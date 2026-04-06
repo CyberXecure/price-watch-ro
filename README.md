@@ -89,13 +89,15 @@ Pornire manuală exemplu:
 
 ## Screenshots
 
-### Lists overview
+## Screenshots
 
-![Lists overview](docs/images/screenshot-dashboard.png)
+### Privire generală asupra listelor
 
-### Watchlist details
+![Privire generală asupra listelor](docs/images/screenshot-dashboard.png)
 
-![Watchlist details](docs/images/screenshot-watchlist.png)
+### Detalii listă și produse urmărite
+
+![Detalii listă și produse urmărite](docs/images/screenshot-watchlist.png)
 
 ## Variabile de mediu
 
