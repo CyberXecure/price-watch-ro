@@ -16,12 +16,12 @@ function MetricCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
-      <div className="text-sm text-black/60">{label}</div>
-      <div className="mt-2 text-3xl font-semibold tracking-tight">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-sm backdrop-blur-sm">
+      <div className="text-sm text-white/60">{label}</div>
+      <div className="mt-2 text-3xl font-semibold tracking-tight text-white">
         {formatNumber(value)}
       </div>
-      {hint ? <div className="mt-2 text-sm text-black/50">{hint}</div> : null}
+      {hint ? <div className="mt-2 text-sm text-white/45">{hint}</div> : null}
     </div>
   );
 }
@@ -39,18 +39,18 @@ function StatusCard({
 }) {
   const toneClass =
     tone === "good"
-      ? "border-emerald-200 bg-emerald-50"
+      ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100"
       : tone === "warn"
-        ? "border-rose-200 bg-rose-50"
-        : "border-amber-200 bg-amber-50";
+        ? "border-rose-400/20 bg-rose-500/10 text-rose-100"
+        : "border-amber-400/20 bg-amber-500/10 text-amber-100";
 
   return (
     <div className={`rounded-2xl border p-5 ${toneClass}`}>
-      <div className="text-sm font-medium text-black/70">{label}</div>
+      <div className="text-sm font-medium text-white/70">{label}</div>
       <div className="mt-2 text-3xl font-semibold tracking-tight">
         {formatNumber(value)}
       </div>
-      <div className="mt-2 text-sm text-black/60">{hint}</div>
+      <div className="mt-2 text-sm text-white/60">{hint}</div>
     </div>
   );
 }
@@ -69,32 +69,32 @@ function WatchlistPreviewCard({
   rasfat: number;
 }) {
   return (
-    <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-sm backdrop-blur-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-lg font-semibold">{name}</div>
-          <div className="mt-1 text-sm text-black/55">
+          <div className="text-lg font-semibold text-white">{name}</div>
+          <div className="mt-1 text-sm text-white/55">
             {totalItems} produse urmărite
           </div>
         </div>
 
-        <div className="rounded-full bg-black px-3 py-1 text-xs font-medium text-white">
+        <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-black">
           Listă
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-        <div className="rounded-xl bg-emerald-50 px-3 py-2 text-center">
+        <div className="rounded-xl bg-emerald-500/10 px-3 py-2 text-center text-emerald-100">
           <div className="font-semibold">{chilipir}</div>
-          <div className="text-black/60">Chilipir</div>
+          <div className="text-white/60">Chilipir</div>
         </div>
-        <div className="rounded-xl bg-amber-50 px-3 py-2 text-center">
+        <div className="rounded-xl bg-amber-500/10 px-3 py-2 text-center text-amber-100">
           <div className="font-semibold">{pretCinstit}</div>
-          <div className="text-black/60">Preț cinstit</div>
+          <div className="text-white/60">Preț cinstit</div>
         </div>
-        <div className="rounded-xl bg-rose-50 px-3 py-2 text-center">
+        <div className="rounded-xl bg-rose-500/10 px-3 py-2 text-center text-rose-100">
           <div className="font-semibold">{rasfat}</div>
-          <div className="text-black/60">Răsfăț</div>
+          <div className="text-white/60">Răsfăț</div>
         </div>
       </div>
     </div>
@@ -115,19 +115,19 @@ export default async function HomePage() {
     .slice(0, 3);
 
   return (
-    <main className="min-h-screen bg-neutral-50 text-black">
+    <main className="min-h-screen bg-[#0b1020] text-white">
       <section className="mx-auto max-w-7xl px-6 py-12 md:px-8 md:py-16">
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
           <div>
-            <div className="inline-flex rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-black/70 shadow-sm">
+            <div className="inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/75 shadow-sm backdrop-blur-sm">
               Chilipir · Freshful price intelligence
             </div>
 
-            <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">
+            <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-white md:text-6xl">
               Urmărești prețurile mai inteligent.
             </h1>
 
-            <p className="mt-5 max-w-2xl text-base leading-7 text-black/65 md:text-lg">
+            <p className="mt-5 max-w-2xl text-base leading-7 text-white/65 md:text-lg">
               Liste și alerte de preț pentru Freshful. Setezi targeturi, compari
               corect pe lei/l, lei/kg sau lei/buc și vezi instant dacă un produs
               este Chilipir, Preț cinstit sau Răsfăț.
@@ -136,22 +136,22 @@ export default async function HomePage() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/lists"
-                className="inline-flex items-center justify-center rounded-2xl bg-black px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:opacity-90"
+                className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-blue-500"
               >
                 Deschide listele
               </Link>
 
               <Link
                 href="/lists"
-                className="inline-flex items-center justify-center rounded-2xl border border-black/10 bg-white px-5 py-3 text-sm font-medium text-black shadow-sm transition hover:bg-black/5"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-white/10"
               >
                 Creează și gestionează liste
               </Link>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-            <div className="text-sm font-medium text-black/60">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur-sm">
+            <div className="text-sm font-medium text-white/60">
               Imagine rapidă asupra datelor tale
             </div>
 
@@ -209,17 +209,17 @@ export default async function HomePage() {
       <section className="mx-auto max-w-7xl px-6 py-10 md:px-8">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight">
+            <h2 className="text-2xl font-semibold tracking-tight text-white">
               Preview de watchlists
             </h2>
-            <p className="mt-2 text-sm text-black/60">
+            <p className="mt-2 text-sm text-white/60">
               Cele mai relevante liste, direct din datele deja salvate.
             </p>
           </div>
 
           <Link
             href="/lists"
-            className="text-sm font-medium text-black underline underline-offset-4"
+            className="text-sm font-medium text-white underline underline-offset-4"
           >
             Vezi toate listele
           </Link>
@@ -238,7 +238,7 @@ export default async function HomePage() {
               />
             ))
           ) : (
-            <div className="rounded-2xl border border-dashed border-black/15 bg-white p-6 text-sm text-black/60 lg:col-span-3">
+            <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-6 text-sm text-white/60 lg:col-span-3">
               Nu există încă liste disponibile. Creează prima watchlist pentru a
               începe monitorizarea.
             </div>
@@ -248,66 +248,80 @@ export default async function HomePage() {
 
       <section className="mx-auto max-w-7xl px-6 py-4 md:px-8 md:py-8">
         <div className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-            <div className="text-sm font-medium text-black/60">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur-sm">
+            <div className="text-sm font-medium text-white/60">
               De ce contează prețul unitar
             </div>
-            <h3 className="mt-3 text-2xl font-semibold tracking-tight">
+            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white">
               Compari corect, nu doar repede.
             </h3>
-            <p className="mt-3 text-sm leading-7 text-black/65">
+            <p className="mt-3 text-sm leading-7 text-white/65">
               Prețul total poate părea bun, dar decizia corectă vine din
               comparația pe aceeași unitate: lei/l, lei/kg sau lei/buc. Asta
               este baza statusurilor Chilipir, Preț cinstit și Răsfăț.
             </p>
 
-            <div className="mt-5 rounded-2xl bg-neutral-50 p-4">
-              <div className="text-sm text-black/60">Exemplu simplu</div>
+            <div className="mt-5 rounded-2xl bg-[#121a33] p-4">
+              <div className="text-sm text-white/60">Exemplu simplu</div>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-white p-4 shadow-sm">
-                  <div className="text-sm text-black/55">Produs A</div>
-                  <div className="mt-2 text-lg font-semibold">8,99 lei</div>
-                  <div className="text-sm text-black/60">500 g</div>
-                  <div className="mt-2 text-sm font-medium">17,98 lei/kg</div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm">
+                  <div className="text-sm text-white/55">Produs A</div>
+                  <div className="mt-2 text-lg font-semibold text-white">
+                    8,99 lei
+                  </div>
+                  <div className="text-sm text-white/60">500 g</div>
+                  <div className="mt-2 text-sm font-medium text-emerald-200">
+                    17,98 lei/kg
+                  </div>
                 </div>
 
-                <div className="rounded-2xl bg-white p-4 shadow-sm">
-                  <div className="text-sm text-black/55">Produs B</div>
-                  <div className="mt-2 text-lg font-semibold">15,99 lei</div>
-                  <div className="text-sm text-black/60">1 kg</div>
-                  <div className="mt-2 text-sm font-medium">15,99 lei/kg</div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm">
+                  <div className="text-sm text-white/55">Produs B</div>
+                  <div className="mt-2 text-lg font-semibold text-white">
+                    15,99 lei
+                  </div>
+                  <div className="text-sm text-white/60">1 kg</div>
+                  <div className="mt-2 text-sm font-medium text-emerald-200">
+                    15,99 lei/kg
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-black/10 bg-black p-6 text-white shadow-sm">
+          <div className="rounded-3xl border border-blue-500/20 bg-gradient-to-br from-blue-600/20 via-fuchsia-500/10 to-transparent p-6 text-white shadow-sm backdrop-blur-sm">
             <div className="text-sm font-medium text-white/65">
               Workflow simplu
             </div>
-            <h3 className="mt-3 text-2xl font-semibold tracking-tight">
+            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white">
               Listezi. Setezi ținta. Verifici instant.
             </h3>
 
             <div className="mt-6 grid gap-3">
-              <div className="rounded-2xl bg-white/10 p-4">
-                <div className="text-sm font-medium">1. Adaugi produse</div>
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                <div className="text-sm font-medium text-white">
+                  1. Adaugi produse
+                </div>
                 <div className="mt-1 text-sm text-white/70">
                   Organizezi produsele în watchlists utile pentru cumpărături
                   recurente.
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white/10 p-4">
-                <div className="text-sm font-medium">2. Setezi targeturi</div>
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                <div className="text-sm font-medium text-white">
+                  2. Setezi targeturi
+                </div>
                 <div className="mt-1 text-sm text-white/70">
                   Compari pe unitatea corectă și decizi ce înseamnă un preț bun
                   pentru tine.
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white/10 p-4">
-                <div className="text-sm font-medium">3. Vezi statusul</div>
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+                <div className="text-sm font-medium text-white">
+                  3. Vezi statusul
+                </div>
                 <div className="mt-1 text-sm text-white/70">
                   Chilipir, Preț cinstit sau Răsfăț — fără să calculezi manual.
                 </div>
