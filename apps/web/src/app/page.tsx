@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getDashboardSummary, getWatchlistsWithSummary } from "@/lib/api";
+import LocalServicesStatus from "@/components/local-services-status";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("ro-RO").format(value);
@@ -179,6 +180,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <LocalServicesStatus />
 
       <section className="mx-auto max-w-7xl px-6 pb-6 md:px-8">
         <div className="grid gap-4 md:grid-cols-3">

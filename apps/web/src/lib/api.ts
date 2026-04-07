@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_BASE?.trim() || "http://127.0.0.1:8000";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -84,6 +84,15 @@ export type WatchlistDetailedItem = {
   created_at: string;
 };
 
+export type RenderedHealth = {
+  status: "ok" | "error";
+  target: string;
+  http_status: number | null;
+  browser: string | null;
+  websocket_debugger_url: string | null;
+  detail: string | null;
+};
+
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   return apiFetch<DashboardSummary>("/dashboard/summary");
 }
@@ -99,6 +108,9 @@ export async function getWatchlistsWithSummary(): Promise<WatchlistSummary[]> {
 export async function getWatchlist(watchlistId: number): Promise<Watchlist> {
   return apiFetch<Watchlist>(`/watchlists/${watchlistId}`);
 }
+
+export async function getRenderedHealth(): Promise<RenderedHealth> {
+  return apiFetch("/health/rendered");
 
 export async function getWatchlistDetailedItems(
   watchlistId: number,
@@ -164,3 +176,4 @@ export async function archiveWatchlistItem(
     is_active: false,
   });
 }
+

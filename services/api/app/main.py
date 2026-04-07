@@ -1,5 +1,8 @@
 import asyncio
+import json
 import sys
+from urllib.error import URLError
+from urllib.request import urlopen
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,6 +41,43 @@ def on_startup() -> None:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/health/rendered")
+def health_rendered() -> dict[str, str | int | None]:
+    target = "http://127.0.0.1:9222/json/version"
+
+    try:
+        with urlopen(target, timeout=2) as response:
+            status_code = getattr(response, "status", 200)
+            payload = json.loads(response.read().decode("utf-8"))
+
+        return {
+            "status": "ok",
+            "target": target,
+            "http_status": status_code,
+            "browser": payload.get("Browser"),
+            "websocket_debugger_url": payload.get("webSocketDebuggerUrl"),
+            "detail": None,
+        }
+    except URLError as exc:
+        return {
+            "status": "error",
+            "target": target,
+            "http_status": None,
+            "browser": None,
+            "websocket_debugger_url": None,
+            "detail": f"{type(exc).__name__}: {exc}",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "target": target,
+            "http_status": None,
+            "browser": None,
+            "websocket_debugger_url": None,
+            "detail": f"{type(exc).__name__}: {exc}",
+        }
 
 
 app.include_router(watchlists_router)
