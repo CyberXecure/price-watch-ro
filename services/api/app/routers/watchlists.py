@@ -84,7 +84,7 @@ def _build_payload_from_parsed(
         unit_price_value=parsed.get("unit_price_value"),
         unit_price_unit=parsed.get("unit_price_unit"),
         old_price=parsed.get("old_price"),
-        promo_label=parsed.get("promo_label"),
+        promo_label=_normalize_promo_label(parsed.get("promo_label")),
         discount_percent=parsed.get("discount_percent"),
         deposit_value=parsed.get("deposit_value"),
         availability=parsed.get("availability"),
@@ -95,6 +95,145 @@ def _build_payload_from_parsed(
         notify_high_price=item.notify_high_price,
     )
 
+def _first_non_empty(*values):
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+def _normalize_promo_label(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    normalized = (
+        text.upper()
+        .replace("Ă", "A")
+        .replace("Â", "A")
+        .replace("Î", "I")
+        .replace("Ș", "S")
+        .replace("Ş", "S")
+        .replace("Ț", "T")
+        .replace("Ţ", "T")
+    )
+
+    mapping = {
+        "DEAL": "OFERTĂ",
+        "DEALS": "OFERTĂ",
+        "OFERTA": "OFERTĂ",
+        "PROMO": "OFERTĂ",
+    }
+
+    return mapping.get(normalized, text)
+
+def _merge_refresh_parsed(
+    *,
+    static_parsed: dict | None,
+    rendered_parsed: dict | None,
+    product: StoreProduct,
+) -> dict:
+    static_parsed = static_parsed or {}
+    rendered_parsed = rendered_parsed or {}
+
+    merged = {
+        "url": _first_non_empty(
+            rendered_parsed.get("url"),
+            static_parsed.get("url"),
+            product.url,
+        ),
+        "title": _first_non_empty(
+            rendered_parsed.get("title"),
+            static_parsed.get("title"),
+            product.title,
+        ),
+        "brand": _first_non_empty(
+            rendered_parsed.get("brand"),
+            static_parsed.get("brand"),
+            product.brand,
+        ),
+        "image_url": _first_non_empty(
+            rendered_parsed.get("image_url"),
+            static_parsed.get("image_url"),
+            product.image_url,
+        ),
+        "category": _first_non_empty(
+            rendered_parsed.get("category"),
+            static_parsed.get("category"),
+            product.category,
+        ),
+        "package_text": _first_non_empty(
+            rendered_parsed.get("package_text"),
+            static_parsed.get("package_text"),
+            product.package_text,
+        ),
+        "base_measure_type": _first_non_empty(
+            rendered_parsed.get("base_measure_type"),
+            static_parsed.get("base_measure_type"),
+            product.base_measure_type,
+            "unknown",
+        ),
+        "base_measure_value": _first_non_empty(
+            rendered_parsed.get("base_measure_value"),
+            static_parsed.get("base_measure_value"),
+            product.base_measure_value,
+        ),
+        "base_measure_unit": _first_non_empty(
+            rendered_parsed.get("base_measure_unit"),
+            static_parsed.get("base_measure_unit"),
+            product.base_measure_unit,
+        ),
+        "external_id": _first_non_empty(
+            rendered_parsed.get("external_id"),
+            static_parsed.get("external_id"),
+            product.external_id,
+        ),
+        "currency": _first_non_empty(
+            rendered_parsed.get("currency"),
+            static_parsed.get("currency"),
+            "RON",
+        ),
+        "price_total": _first_non_empty(
+            rendered_parsed.get("price_total"),
+            static_parsed.get("price_total"),
+        ),
+        "unit_price_value": _first_non_empty(
+            rendered_parsed.get("unit_price_value"),
+            static_parsed.get("unit_price_value"),
+        ),
+        "unit_price_unit": _first_non_empty(
+            rendered_parsed.get("unit_price_unit"),
+            static_parsed.get("unit_price_unit"),
+        ),
+        "old_price": _first_non_empty(
+            rendered_parsed.get("old_price"),
+            static_parsed.get("old_price"),
+        ),
+        "promo_label": _first_non_empty(
+            rendered_parsed.get("promo_label"),
+            static_parsed.get("promo_label"),
+        ),
+        "discount_percent": _first_non_empty(
+            rendered_parsed.get("discount_percent"),
+            static_parsed.get("discount_percent"),
+        ),
+        "deposit_value": _first_non_empty(
+            rendered_parsed.get("deposit_value"),
+            static_parsed.get("deposit_value"),
+        ),
+        "availability": _first_non_empty(
+            rendered_parsed.get("availability"),
+            static_parsed.get("availability"),
+            "unknown",
+        ),
+    }
+
+    return merged
 
 def _build_refresh_response(
     *,
@@ -335,7 +474,6 @@ def refresh_watchlist_item(
             WatchlistItem.id == item_id,
         )
     ).first()
-
     if not item:
         raise HTTPException(status_code=404, detail="Watchlist item not found")
 
@@ -351,7 +489,10 @@ def refresh_watchlist_item(
         upsert_result = upsert_product_snapshot_and_watchlist(
             payload=payload,
             session=session,
+            forced_watchlist_item_id=item.id,
         )
+
+        session.refresh(item)
 
         return _build_refresh_response(
             session=session,
@@ -368,7 +509,7 @@ def refresh_watchlist_item(
     except Exception as exc:
         raise HTTPException(
             status_code=400,
-            detail="Rendered refresh failed:\n" + traceback.format_exc(),
+            detail=f"Static refresh failed: {type(exc).__name__}: {exc}",
         ) from exc
 
 
@@ -384,7 +525,6 @@ def refresh_watchlist_item_rendered(
             WatchlistItem.id == item_id,
         )
     ).first()
-
     if not item:
         raise HTTPException(status_code=404, detail="Watchlist item not found")
 
@@ -403,17 +543,26 @@ def refresh_watchlist_item_rendered(
 
         rendered_parsed = parse_freshful_product_rendered(product.url)
 
-        if rendered_parsed.get("price_total") is None:
+        merged_parsed = _merge_refresh_parsed(
+            static_parsed=static_parsed,
+            rendered_parsed=rendered_parsed,
+            product=product,
+        )
+
+        if merged_parsed.get("price_total") is None:
             raise HTTPException(
                 status_code=400,
                 detail="Rendered refresh failed: missing price_total",
             )
 
-        payload = _build_payload_from_parsed(rendered_parsed, watchlist_id, item)
+        payload = _build_payload_from_parsed(merged_parsed, watchlist_id, item)
         upsert_result = upsert_product_snapshot_and_watchlist(
             payload=payload,
             session=session,
+            forced_watchlist_item_id=item.id,
         )
+
+        session.refresh(item)
 
         return _build_refresh_response(
             session=session,
