@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_BASE?.trim() || "http://127.0.0.1:8000";
 
 type Props = {
   watchlistId: number;
