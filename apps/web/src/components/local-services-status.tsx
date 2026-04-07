@@ -1,9 +1,9 @@
-import { getRenderedHealth } from "@/lib/api";
+import { getApiHealth, getRenderedHealth } from "@/lib/api";
 
 function statusTone(status: "ok" | "error") {
   return status === "ok"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-    : "border-rose-200 bg-rose-50 text-rose-900";
+    ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100"
+    : "border-rose-400/20 bg-rose-500/10 text-rose-100";
 }
 
 function statusLabel(status: "ok" | "error") {
@@ -11,6 +11,10 @@ function statusLabel(status: "ok" | "error") {
 }
 
 export default async function LocalServicesStatus() {
+  const api = await getApiHealth().catch(() => ({
+    status: "error" as const,
+  }));
+
   const rendered = await getRenderedHealth().catch((error: unknown) => ({
     status: "error" as const,
     target: "http://127.0.0.1:9222/json/version",
@@ -20,47 +24,48 @@ export default async function LocalServicesStatus() {
     detail: error instanceof Error ? error.message : "Cererea a eșuat",
   }));
 
-  const apiStatus = {
-    status: "ok" as const,
-    target: "http://127.0.0.1:8000/health",
-    detail: "Pagina s-a încărcat din API-ul local.",
-  };
-
   return (
     <section className="mx-auto max-w-7xl px-6 py-4 md:px-8">
-      <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="text-sm font-medium text-black/60">
+            <div className="text-sm font-medium text-white/60">
               Status mediu local
             </div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
               Verificare rapidă servicii
             </h2>
           </div>
 
-          <div className="text-sm text-black/50">
+          <div className="text-sm text-white/50">
             Util înainte de actualizare promo
           </div>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <div className={`rounded-2xl border p-5 ${statusTone(apiStatus.status)}`}>
+          <div className={`rounded-2xl border p-5 ${statusTone(api.status)}`}>
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-medium">API local</div>
-              <div className="rounded-full bg-black/5 px-3 py-1 text-xs font-semibold">
-                {statusLabel(apiStatus.status)}
+              <div className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
+                {statusLabel(api.status)}
               </div>
             </div>
 
-            <div className="mt-3 text-sm opacity-80">{apiStatus.target}</div>
-            <div className="mt-3 text-sm opacity-80">{apiStatus.detail}</div>
+            <div className="mt-3 text-sm opacity-80">
+              http://127.0.0.1:8000/health
+            </div>
+
+            <div className="mt-3 text-sm opacity-80">
+              {api.status === "ok"
+                ? "API-ul local răspunde corect."
+                : "API-ul local nu răspunde acum."}
+            </div>
           </div>
 
           <div className={`rounded-2xl border p-5 ${statusTone(rendered.status)}`}>
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-medium">Promo refresh engine</div>
-              <div className="rounded-full bg-black/5 px-3 py-1 text-xs font-semibold">
+              <div className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
                 {statusLabel(rendered.status)}
               </div>
             </div>
