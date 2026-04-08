@@ -149,8 +149,8 @@ function deltaBadgeClass(delta: number | null): string {
 
 function filterLinkClass(isActive: boolean): string {
   return isActive
-    ? "rounded-full bg-white px-3 py-1.5 text-xs font-medium text-black"
-    : "rounded-full px-3 py-1.5 text-xs font-medium text-white/65 transition hover:bg-white/5 hover:text-white";
+    ? "rounded-full border border-blue-400/20 bg-blue-500/15 px-3 py-1.5 text-xs font-medium text-blue-100 shadow-sm"
+    : "rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/65 transition hover:bg-white/10 hover:text-white";
 }
 
 function kpiCard(
