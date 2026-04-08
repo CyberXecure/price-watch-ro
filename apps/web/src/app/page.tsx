@@ -331,7 +331,7 @@ export default async function HomePage() {
             <div className="mt-6">
               <Link
                 href="/lists"
-                className="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                className="inline-flex items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/15 px-5 py-3 text-sm font-medium text-blue-100 shadow-sm transition hover:bg-blue-500/20"
               >
                 Intră în aplicație
               </Link>
