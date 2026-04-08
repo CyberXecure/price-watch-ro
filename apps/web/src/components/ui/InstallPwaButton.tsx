@@ -51,7 +51,7 @@ export function InstallPwaButton() {
 
   if (isInstalled) {
     return (
-      <span className="inline-flex h-11 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 text-sm font-medium text-emerald-200 shadow-sm">
+      <span className="inline-flex h-10 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 text-sm font-medium text-emerald-200 shadow-sm md:h-11">
         Installed
       </span>
     );
@@ -65,7 +65,7 @@ export function InstallPwaButton() {
     <button
       type="button"
       onClick={handleInstall}
-      className="inline-flex h-11 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/15 px-4 text-sm font-medium text-blue-100 shadow-sm transition hover:bg-blue-500/20"
+      className="inline-flex h-10 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/15 px-4 text-sm font-medium text-blue-100 shadow-sm transition hover:bg-blue-500/20 md:h-11"
     >
       Install
     </button>
