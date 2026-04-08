@@ -25,7 +25,8 @@ export function InstallPwaButton() {
 
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+      (window.navigator as Navigator & { standalone?: boolean }).standalone ===
+        true;
 
     if (standalone) {
       setIsInstalled(true);
@@ -50,7 +51,7 @@ export function InstallPwaButton() {
 
   if (isInstalled) {
     return (
-      <span className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300">
+      <span className="inline-flex h-11 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 text-sm font-medium text-emerald-200 shadow-sm">
         Installed
       </span>
     );
@@ -64,7 +65,7 @@ export function InstallPwaButton() {
     <button
       type="button"
       onClick={handleInstall}
-      className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+      className="inline-flex h-11 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/15 px-4 text-sm font-medium text-blue-100 shadow-sm transition hover:bg-blue-500/20"
     >
       Install
     </button>

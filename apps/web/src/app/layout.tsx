@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { InstallPwaButton } from "@/components/ui/InstallPwaButton";
+import { HeaderNav } from "@/components/ui/HeaderNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 function LogoMark() {
   return (
-    <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-600/15 shadow-[0_0_30px_rgba(37,99,235,0.18)]">
+    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-600/15 shadow-[0_0_30px_rgba(37,99,235,0.18)] md:h-11 md:w-11">
       <svg
         width="22"
         height="22"
@@ -47,36 +47,20 @@ export default function RootLayout({
       <body>
         <div className="min-h-screen">
           <header className="sticky top-0 z-50 border-b border-white/5 bg-[#081120]/80 backdrop-blur-xl">
-            <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-              <Link href="/" className="flex items-center gap-4">
+            <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 md:py-4">
+              <Link href="/" className="flex min-w-0 items-center gap-3 md:gap-4">
                 <LogoMark />
-                <div>
-                  <div className="text-2xl font-bold tracking-tight text-white">
+                <div className="min-w-0">
+                  <div className="truncate text-xl font-bold tracking-tight text-white md:text-2xl">
                     Chilipir
                   </div>
-                  <div className="text-sm text-slate-400">
+                  <div className="hidden text-sm text-slate-400 md:block">
                     Liste și alerte de preț pentru Freshful
                   </div>
                 </div>
               </Link>
 
-              <nav className="flex items-center gap-3 text-sm">
-                <InstallPwaButton />
-
-                <Link
-                  href="/"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-5 py-2.5 text-slate-200 transition hover:bg-white/10"
-                >
-                  Acasă
-                </Link>
-
-                <Link
-                  href="/lists"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-5 py-2.5 text-slate-200 transition hover:bg-white/10"
-                >
-                  Liste
-                </Link>
-              </nav>
+              <HeaderNav />
             </div>
           </header>
 
