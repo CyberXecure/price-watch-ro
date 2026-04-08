@@ -11,10 +11,10 @@ export const metadata: Metadata = {
 
 function LogoMark() {
   return (
-    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-600/15 shadow-[0_0_30px_rgba(37,99,235,0.18)] md:h-11 md:w-11">
+    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-600/15 shadow-[0_0_24px_rgba(37,99,235,0.16)] md:h-10 md:w-10">
       <svg
-        width="22"
-        height="22"
+        width="20"
+        height="20"
         viewBox="0 0 24 24"
         fill="none"
         aria-hidden="true"
@@ -47,14 +47,16 @@ export default function RootLayout({
       <body>
         <div className="min-h-screen">
           <header className="sticky top-0 z-50 border-b border-white/5 bg-[#081120]/80 backdrop-blur-xl">
-            <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 md:py-4">
-              <Link href="/" className="flex min-w-0 items-center gap-3 md:gap-4">
+            <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 md:py-3.5">
+              <Link href="/" className="flex min-w-0 items-center gap-3">
                 <LogoMark />
+
                 <div className="min-w-0">
-                  <div className="truncate text-xl font-bold tracking-tight text-white md:text-2xl">
+                  <div className="truncate text-[1.9rem] font-bold leading-none tracking-tight text-white md:text-[2.1rem]">
                     Chilipir
                   </div>
-                  <div className="hidden text-sm text-slate-400 md:block">
+
+                  <div className="mt-1 hidden truncate text-sm text-slate-400 md:block">
                     Liste și alerte de preț pentru Freshful
                   </div>
                 </div>
