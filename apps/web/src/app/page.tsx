@@ -136,7 +136,7 @@ export default async function HomePage() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/lists"
-                className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-blue-500"
+                className="inline-flex items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/15 px-5 py-3 text-sm font-medium text-blue-100 shadow-sm transition hover:bg-blue-500/20"
               >
                 Deschide listele
               </Link>
