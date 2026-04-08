@@ -10,7 +10,8 @@ const navButtonBase =
 const navButtonInactive =
   "border-white/10 bg-white/5 text-white/75 hover:bg-white/10 hover:text-white";
 
-const navButtonActive = "border-white/10 bg-white text-black";
+const navButtonActive =
+  "border-blue-400/20 bg-blue-500/15 text-blue-100 shadow-sm";
 
 export function HeaderNav() {
   const pathname = usePathname();
