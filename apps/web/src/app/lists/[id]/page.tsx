@@ -40,6 +40,24 @@ function formatComparison(
   return `${formatNumeric(value)} ${normalizeUnit(unit)}`;
 }
 
+function formatTarget(
+  value: number | null | undefined,
+  unit: string | null | undefined,
+): string {
+  if (value === null || value === undefined) return "-";
+
+  const cleanedUnit = unit?.trim();
+  if (!cleanedUnit) {
+    return `${formatNumeric(value)} lei`;
+  }
+
+  if (cleanedUnit.startsWith("lei/")) {
+    return `${formatNumeric(value)} ${cleanedUnit}`;
+  }
+
+  return `${formatNumeric(value)} lei/${cleanedUnit}`;
+}
+
 function formatCapturedAt(value: string | null | undefined): string {
   if (!value) return "-";
 
@@ -166,8 +184,10 @@ function kpiCard(
         : "border-white/10 bg-white/5 text-white";
 
   return (
-    <div className={`rounded-2xl border p-4 ${toneClass}`}>
-      <div className="text-xs uppercase tracking-wide text-white/55">{label}</div>
+    <div className={`rounded-3xl border p-5 ${toneClass}`}>
+      <div className="text-xs uppercase tracking-wide text-white/55">
+        {label}
+      </div>
       <div className="mt-2 text-3xl font-semibold tracking-tight">{value}</div>
     </div>
   );
@@ -226,17 +246,17 @@ export default async function WatchlistDetailPage({
 
   return (
     <main className="min-h-screen bg-[#0b1020] text-white">
-      <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-10">
+      <div className="mx-auto max-w-7xl px-6 py-10 md:px-8 md:py-12">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <Link
               href="/lists"
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 shadow-sm transition hover:bg-white/10 hover:text-white"
             >
               ← Înapoi la liste
             </Link>
 
-            <h1 className="mt-5 text-4xl font-semibold tracking-tight">
+            <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white">
               {watchlist.name}
             </h1>
 
@@ -245,7 +265,7 @@ export default async function WatchlistDetailPage({
             </p>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 lg:w-[360px]">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-sm backdrop-blur-sm lg:w-[360px]">
             <div className="text-sm font-medium text-white/70">Alte liste</div>
             <div className="mt-4 flex flex-wrap gap-2">
               {allWatchlists.map((list) => (
@@ -254,7 +274,7 @@ export default async function WatchlistDetailPage({
                   href={`/lists/${list.id}`}
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                     list.id === watchlistId
-                      ? "border-white/10 bg-white text-black"
+                      ? "border-blue-400/20 bg-blue-500/15 text-blue-100 shadow-sm"
                       : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10 hover:text-white"
                   }`}
                 >
@@ -265,10 +285,12 @@ export default async function WatchlistDetailPage({
           </div>
         </div>
 
-        <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
+        <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur-sm">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">Importă produse</h2>
+              <h2 className="text-xl font-semibold tracking-tight text-white">
+                Importă produse
+              </h2>
               <p className="mt-2 text-sm text-white/65">
                 Adaugă în această listă produse Freshful pentru monitorizare.
               </p>
@@ -287,7 +309,7 @@ export default async function WatchlistDetailPage({
           </div>
         </section>
 
-        <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-5">
+        <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-5 shadow-sm backdrop-blur-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               <Link
@@ -334,7 +356,7 @@ export default async function WatchlistDetailPage({
         <section className="mt-8">
           {visibleItems.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center">
-              <h2 className="text-2xl font-semibold tracking-tight">
+              <h2 className="text-2xl font-semibold tracking-tight text-white">
                 {promoOnly
                   ? "Nu există promoții pentru filtrul selectat"
                   : view === "hidden"
@@ -369,6 +391,7 @@ export default async function WatchlistDetailPage({
                 )
                   ? item.product_image_url
                   : null;
+
                 const itemHasPromo = hasPromo(item);
                 const delta = getComparableDelta(item);
 
@@ -495,14 +518,10 @@ export default async function WatchlistDetailPage({
                         </div>
                       )}
                     </div>
-
+                       {formatTarget(item.target_price, item.target_unit)}
                     <div>
                       <div className="text-lg font-semibold text-white">
-                        {item.target_price !== null && item.target_price !== undefined
-                          ? `${formatNumeric(item.target_price)} lei${
-                              item.target_unit ? `/${item.target_unit}` : ""
-                            }`
-                          : "-"}
+                        
                       </div>
 
                       <div
