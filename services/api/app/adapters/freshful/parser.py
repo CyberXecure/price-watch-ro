@@ -89,6 +89,31 @@ def extract_brand_from_url(url: str) -> Optional[str]:
     return slug_to_brand_name("-".join(brand_parts))
 
 
+def infer_brand_from_title(title: Optional[str]) -> Optional[str]:
+    if not title:
+        return None
+
+    first_word = clean_text(title.split(" ")[0]) if title else None
+    if not first_word:
+        return None
+
+    blocked = {
+        "pui", "lapte", "ouă", "oua", "mere", "banane", "cartofi",
+        "iaurt", "apă", "apa", "ulei", "pâine", "paine", "brânză",
+        "branza", "cașcaval", "cascaval", "detergent", "scutece",
+        "bețișoare", "betisoare", "buchet", "limonadă", "limonada",
+        "lămâi", "lamai",
+    }
+
+    if first_word.lower() in blocked:
+        return None
+
+    if re.search(r"\d", first_word):
+        return None
+
+    return first_word
+
+
 def parse_price_string(value: Optional[str]) -> Optional[float]:
     if not value:
         return None
@@ -143,6 +168,7 @@ def extract_discount_percent(text: str) -> Optional[float]:
     patterns = [
         r"-\s*(\d+(?:[.,]\d+)?)\s*%",
         r"economisești\s*(\d+(?:[.,]\d+)?)\s*%",
+        r"economisesti\s*(\d+(?:[.,]\d+)?)\s*%",
         r"(\d+(?:[.,]\d+)?)\s*%",
     ]
 
@@ -362,31 +388,6 @@ def find_first_text_matching(patterns: list[str], text: str) -> Optional[str]:
     return None
 
 
-def infer_brand_from_title(title: Optional[str]) -> Optional[str]:
-    if not title:
-        return None
-
-    first_word = clean_text(title.split(" ")[0]) if title else None
-    if not first_word:
-        return None
-
-    blocked = {
-        "pui", "lapte", "ouă", "oua", "mere", "banane", "cartofi",
-        "iaurt", "apă", "apa", "ulei", "pâine", "paine", "brânză",
-        "branza", "cașcaval", "cascaval", "detergent", "scutece",
-        "bețișoare", "betisoare", "buchet", "limonadă", "limonada",
-        "lămâi", "lamai",
-    }
-
-    if first_word.lower() in blocked:
-        return None
-
-    if re.search(r"\d", first_word):
-        return None
-
-    return first_word
-
-
 def extract_package_text(text: str) -> Optional[str]:
     patterns = [
         r"\b(\d+(?:[.,]\d+)?\s*(?:kg|g|ml|l|buc|fire))\b",
@@ -454,10 +455,17 @@ def extract_prices_from_text(text: str) -> list[float]:
         except ValueError:
             continue
 
-        start = max(0, match.start() - 16)
-        prefix = text[start:match.start()]
+        start = max(0, match.start() - 24)
+        end = min(len(text), match.end() + 40)
+        context = text[start:end].lower()
 
-        if "+" in prefix:
+        if "+" in context:
+            continue
+        if re.search(r"\b\d+\s*buc\b", context):
+            continue
+        if re.search(r"adaugă în coș|adauga in cos", context):
+            continue
+        if re.search(r"cod\b", context):
             continue
 
         if 0.5 <= value <= 500:
@@ -470,8 +478,8 @@ def extract_primary_offer_prices(text: str) -> tuple[Optional[float], Optional[f
     normalized = re.sub(r"\s+", " ", text).strip()
 
     patterns = [
-        r"(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc)).{0,80}?(?:Economisești|economisești)\s*\d+(?:[.,]\d+)?\s*%.{0,80}?(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc))",
-        r"(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc)).{0,80}?-\s*\d+(?:[.,]\d+)?\s*%.{0,80}?(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc))",
+        r"(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc)).{0,80}?(?:Economisești|economisești|economisesti)\s*\d+(?:[.,]\d+)?\s*%.{0,80}?(\d+(?:[.,]\d{1,2})?)\s*Lei",
+        r"(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc)).{0,80}?-\s*\d+(?:[.,]\d+)?\s*%.{0,80}?(\d+(?:[.,]\d{1,2})?)\s*Lei",
     ]
 
     for pattern in patterns:
@@ -479,54 +487,64 @@ def extract_primary_offer_prices(text: str) -> tuple[Optional[float], Optional[f
         if not match:
             continue
 
-        old_price = parse_price_string(match.group(1))
-        current_price = parse_price_string(match.group(2))
+        first = parse_price_string(match.group(1))
+        second = parse_price_string(match.group(2))
 
-        if (
-            current_price is not None
-            and old_price is not None
-            and old_price > current_price
-        ):
+        if first is None or second is None:
+            continue
+
+        if first >= second:
+            current_price = second
+            old_price = first
+        else:
+            current_price = first
+            old_price = second
+
+        if old_price > current_price:
             return current_price, old_price
 
     return None, None
 
 
-def select_current_and_old_price(
+def choose_price_total(
+    *,
+    json_ld_price_total: Optional[float],
+    explicit_unit_price_value: Optional[float],
+    explicit_unit_price_unit: Optional[str],
+    measure_type: str,
+    measure_value: Optional[float],
     text: str,
-    discount_percent: Optional[float],
 ) -> tuple[Optional[float], Optional[float]]:
-    primary_current, primary_old = extract_primary_offer_prices(text)
-    if primary_current is not None:
-        return primary_current, primary_old
+    text_current, text_old = extract_primary_offer_prices(text)
+    all_prices = sorted(set(extract_prices_from_text(text)))
 
-    candidates = sorted(set(extract_prices_from_text(text)))
-    if not candidates:
-        return None, None
+    if (
+        json_ld_price_total is not None
+        and explicit_unit_price_value is not None
+        and measure_type in {"count", "weight", "volume"}
+        and measure_value
+    ):
+        implied_from_unit = round(explicit_unit_price_value * measure_value, 2)
 
-    if discount_percent is not None and 0 < discount_percent < 100:
-        best_pair: tuple[float, float] | None = None
-        best_error = float("inf")
+        if abs(json_ld_price_total - implied_from_unit) <= 0.2:
+            old_price = text_old if text_old and text_old > json_ld_price_total else None
+            return json_ld_price_total, old_price
 
-        for current in candidates:
-            for old in candidates:
-                if old <= current:
-                    continue
+    if text_current is not None:
+        old_price = text_old if text_old and text_old > text_current else None
+        return text_current, old_price
 
-                implied_discount = (1 - current / old) * 100
-                error = abs(implied_discount - discount_percent)
+    if json_ld_price_total is not None:
+        old_price = text_old if text_old and text_old > json_ld_price_total else None
+        return json_ld_price_total, old_price
 
-                if error < best_error:
-                    best_error = error
-                    best_pair = (current, old)
+    if all_prices:
+        current = max(all_prices)
+        old_candidates = [x for x in all_prices if x > current]
+        old_price = min(old_candidates) if old_candidates else None
+        return current, old_price
 
-        if best_pair and best_error <= 8:
-            return best_pair
-
-    if len(candidates) == 1:
-        return candidates[0], None
-
-    return candidates[0], candidates[1]
+    return None, None
 
 
 def parse_freshful_product_html(html: str, url: str) -> dict[str, Any]:
@@ -540,7 +558,6 @@ def parse_freshful_product_html(html: str, url: str) -> dict[str, Any]:
     }
 
     json_ld_candidates = extract_json_ld_candidates(soup)
-
     data.update({
         k: v for k, v in extract_brand_and_product_from_json_ld(json_ld_candidates).items()
         if v is not None
@@ -556,42 +573,18 @@ def parse_freshful_product_html(html: str, url: str) -> dict[str, Any]:
     if not data.get("title") and soup.title:
         data["title"] = clean_product_title(soup.title.get_text())
 
-    package_text = extract_package_text(product_text) or extract_package_text(full_text)
+    package_text = extract_package_text(product_text) or extract_package_text(full_text) or extract_package_text(data.get("title") or "")
     if package_text:
         data["package_text"] = package_text
+
+    measure_type, measure_value, measure_unit = infer_measure_from_package(data.get("package_text"))
+    data["base_measure_type"] = measure_type
+    data["base_measure_value"] = measure_value
+    data["base_measure_unit"] = measure_unit
 
     data["discount_percent"] = extract_discount_percent(product_text) or extract_discount_percent(full_text)
     data["promo_label"] = extract_promo_label(product_text) or extract_promo_label(full_text)
     data["deposit_value"] = extract_deposit_value(product_text) or extract_deposit_value(full_text)
-
-    selected_current, selected_old = select_current_and_old_price(
-        text=product_text,
-        discount_percent=data.get("discount_percent"),
-    )
-
-    if selected_current is None:
-        selected_current, selected_old = select_current_and_old_price(
-            text=full_text,
-            discount_percent=data.get("discount_percent"),
-        )
-
-    if selected_current is not None:
-        data["price_total"] = selected_current
-    if selected_old is not None:
-        data["old_price"] = selected_old
-
-    if data.get("price_total") is None and data.get("json_ld_price_total") is not None:
-        data["price_total"] = data.get("json_ld_price_total")
-
-    if data.get("price_total") is None:
-        price_candidate = find_first_text_matching(
-            [
-                r"(\d+(?:[.,]\d{1,2})\s*lei(?!\s*/\s*(?:l|kg|buc)))",
-                r"(\d+(?:[.,]\d{1,2})\s*RON)",
-            ],
-            product_text or full_text,
-        )
-        data["price_total"] = parse_price_string(price_candidate)
 
     unit_price_candidate = (
         find_first_text_matching(
@@ -611,34 +604,60 @@ def parse_freshful_product_html(html: str, url: str) -> dict[str, Any]:
     )
 
     unit_price_value, unit_price_unit = parse_unit_price_text(unit_price_candidate)
-
-    measure_type, measure_value, measure_unit = infer_measure_from_package(data.get("package_text"))
-    data["base_measure_type"] = measure_type
-    data["base_measure_value"] = measure_value
-    data["base_measure_unit"] = measure_unit
-
-    validated_unit_price_value, validated_unit_price_unit = validate_unit_price_for_measure(
+    unit_price_value, unit_price_unit = validate_unit_price_for_measure(
         measure_type=measure_type,
         unit_price_value=unit_price_value,
         unit_price_unit=unit_price_unit,
     )
 
-    final_unit_price_value = validated_unit_price_value
-    final_unit_price_unit = validated_unit_price_unit
+    price_total, old_price = choose_price_total(
+        json_ld_price_total=data.get("json_ld_price_total"),
+        explicit_unit_price_value=unit_price_value,
+        explicit_unit_price_unit=unit_price_unit,
+        measure_type=measure_type,
+        measure_value=measure_value,
+        text=product_text or full_text,
+    )
 
-    if measure_value is not None and measure_value > 0 and data.get("price_total") is not None:
-        if data.get("discount_percent") is not None or final_unit_price_value is None:
-            derived_value, derived_unit = derive_unit_price_from_package(
-                price_total=data.get("price_total"),
-                measure_type=measure_type,
-                measure_value=measure_value,
-            )
-            if derived_value is not None and derived_unit is not None:
-                final_unit_price_value = derived_value
-                final_unit_price_unit = derived_unit
+    if price_total is None:
+        price_candidate = find_first_text_matching(
+            [
+                r"(\d+(?:[.,]\d{1,2})\s*lei(?!\s*/\s*(?:l|kg|buc)))",
+                r"(\d+(?:[.,]\d{1,2})\s*RON)",
+            ],
+            product_text or full_text,
+        )
+        price_total = parse_price_string(price_candidate)
 
-    data["unit_price_value"] = final_unit_price_value
-    data["unit_price_unit"] = final_unit_price_unit
+    if unit_price_value is None and measure_value is not None and measure_value > 0 and price_total is not None:
+        unit_price_value, unit_price_unit = derive_unit_price_from_package(
+            price_total=price_total,
+            measure_type=measure_type,
+            measure_value=measure_value,
+        )
+
+    json_ld_price_total = data.get("json_ld_price_total")
+    data["price_total"] = price_total
+    data["old_price"] = old_price
+    data["unit_price_value"] = unit_price_value
+    data["unit_price_unit"] = unit_price_unit
+
+    if (
+        data["price_total"] is not None
+        and data["unit_price_value"] is not None
+        and measure_type in {"count", "weight", "volume"}
+        and measure_value
+    ):
+        implied_total = round(data["unit_price_value"] * measure_value, 2)
+
+        # Dacă prețul extras și totalul derivat din prețul unitar sunt foarte apropiate,
+        # păstrăm prețul extras din PDP (de ex. 22.99 în loc de 23.00).
+        if abs(data["price_total"] - implied_total) <= 0.2:
+            pass
+        elif json_ld_price_total is not None and abs(json_ld_price_total - implied_total) <= 0.2:
+            data["price_total"] = json_ld_price_total
+        else:
+            data["price_total"] = implied_total
 
     breadcrumb_category = extract_category_from_breadcrumbs(json_ld_candidates)
     data["category"] = data.get("category") or breadcrumb_category
@@ -674,11 +693,6 @@ def debug_freshful_product_html(html: str, url: str) -> dict[str, Any]:
     json_ld_candidates = extract_json_ld_candidates(soup)
     parsed = parse_freshful_product_html(html, url)
 
-    current_from_product, old_from_product = select_current_and_old_price(
-        product_text,
-        extract_discount_percent(product_text) or extract_discount_percent(full_text),
-    )
-
     return {
         "url": url,
         "page_title": clean_text(soup.title.get_text()) if soup.title else None,
@@ -691,8 +705,6 @@ def debug_freshful_product_html(html: str, url: str) -> dict[str, Any]:
         "json_ld_types": [item.get("@type") for item in json_ld_candidates if isinstance(item, dict)],
         "breadcrumb_category": extract_category_from_breadcrumbs(json_ld_candidates),
         "product_text_preview": product_text[:1200],
-        "detected_current_price": current_from_product,
-        "detected_old_price": old_from_product,
         "detected_promo_label": extract_promo_label(product_text) or extract_promo_label(full_text),
         "detected_discount_percent": extract_discount_percent(product_text) or extract_discount_percent(full_text),
         "detected_deposit_value": extract_deposit_value(product_text) or extract_deposit_value(full_text),
@@ -714,3 +726,7 @@ def debug_freshful_product_html(html: str, url: str) -> dict[str, Any]:
         "text_package_match": extract_package_text(product_text) or extract_package_text(full_text),
         "parsed": parsed,
     }
+
+
+
+

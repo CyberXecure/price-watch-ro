@@ -4,6 +4,26 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.db import get_session
+
+def _db_enum_from_ui_unit(unit: str | None) -> str | None:
+    if unit is None:
+        return None
+
+    value = str(unit).strip().lower()
+    if not value:
+        return None
+
+    mapping = {
+        "l": "LEI_PER_L",
+        "lei/l": "LEI_PER_L",
+        "kg": "LEI_PER_KG",
+        "lei/kg": "LEI_PER_KG",
+        "buc": "LEI_PER_BUC",
+        "lei/buc": "LEI_PER_BUC",
+        "total": "TOTAL",
+    }
+
+    return mapping.get(value, unit)
 from app.models import PriceSnapshot, StoreProduct
 from app.schemas import ProductCreate, SnapshotCreate
 from app.services.pricing import (
@@ -85,7 +105,7 @@ def add_price_snapshot(
     comparison_price, comparison_unit = pick_comparison(
         price_total=payload.price_total,
         unit_price_value=payload.unit_price_value,
-        unit_price_unit=payload.unit_price_unit,
+        unit_price_unit=_db_enum_from_ui_unit(payload.unit_price_unit),
     )
 
     snapshot = PriceSnapshot(
@@ -94,9 +114,9 @@ def add_price_snapshot(
         price_total=payload.price_total,
         currency=payload.currency,
         unit_price_value=payload.unit_price_value,
-        unit_price_unit=payload.unit_price_unit,
+        unit_price_unit=_db_enum_from_ui_unit(payload.unit_price_unit),
         comparison_price=comparison_price,
-        comparison_unit=comparison_unit,
+        comparison_unit=_db_enum_from_ui_unit(comparison_unit),
         old_price=payload.old_price,
         promo_label=payload.promo_label,
         availability=payload.availability,
@@ -113,8 +133,9 @@ def add_price_snapshot(
         session=session,
         product=product,
         comparison_price=comparison_price,
-        comparison_unit=comparison_unit,
+        comparison_unit=_db_enum_from_ui_unit(comparison_unit),
     )
     session.commit()
 
     return snapshot
+

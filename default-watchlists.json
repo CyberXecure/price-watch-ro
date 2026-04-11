@@ -1,0 +1,58 @@
+[
+  {
+    "slug": "saptamanal",
+    "name": "Săptămânal",
+    "icon": "calendar",
+    "description": "Produsele cumpărate cel mai des.",
+    "sortOrder": 1
+  },
+  {
+    "slug": "la-10-zile",
+    "name": "La 10 zile",
+    "icon": "refresh-cw",
+    "description": "Reaprovizionare periodică pentru casă.",
+    "sortOrder": 2
+  },
+  {
+    "slug": "lunar",
+    "name": "Lunar",
+    "icon": "package",
+    "description": "Produse cumpărate mai rar, dar constant.",
+    "sortOrder": 3
+  },
+  {
+    "slug": "casa",
+    "name": "Casă",
+    "icon": "home",
+    "description": "Esențiale pentru gospodărie și consum zilnic.",
+    "sortOrder": 4
+  },
+  {
+    "slug": "curatenie",
+    "name": "Curățenie",
+    "icon": "sparkles",
+    "description": "Detergenți, soluții și consumabile de curățenie.",
+    "sortOrder": 5
+  },
+  {
+    "slug": "bebelus",
+    "name": "Bebeluș",
+    "icon": "baby",
+    "description": "Produse dedicate celor mici.",
+    "sortOrder": 6
+  },
+  {
+    "slug": "oferte",
+    "name": "Oferte",
+    "icon": "tag",
+    "description": "Produse urmărite pentru promoții și reduceri.",
+    "sortOrder": 7
+  },
+  {
+    "slug": "chilipiruri",
+    "name": "Chilipiruri",
+    "icon": "badge-percent",
+    "description": "Cele mai bune prețuri și cumpărături inspirate.",
+    "sortOrder": 8
+  }
+]

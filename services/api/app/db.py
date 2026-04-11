@@ -12,22 +12,136 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
 )
 
+DEFAULT_WATCHLISTS = [
+    {
+        "slug": "saptamanal",
+        "name": "Săptămânal",
+        "icon": "calendar",
+        "description": "Produsele cumpărate cel mai des.",
+        "sort_order": 1,
+    },
+    {
+        "slug": "la-10-zile",
+        "name": "La 10 zile",
+        "icon": "refresh-cw",
+        "description": "Reaprovizionare periodică pentru casă.",
+        "sort_order": 2,
+    },
+    {
+        "slug": "lunar",
+        "name": "Lunar",
+        "icon": "package",
+        "description": "Produse cumpărate mai rar, dar constant.",
+        "sort_order": 3,
+    },
+    {
+        "slug": "casa",
+        "name": "Casă",
+        "icon": "home",
+        "description": "Esențiale pentru gospodărie și consum zilnic.",
+        "sort_order": 4,
+    },
+    {
+        "slug": "curatenie",
+        "name": "Curățenie",
+        "icon": "sparkles",
+        "description": "Detergenți, soluții și consumabile de curățenie.",
+        "sort_order": 5,
+    },
+    {
+        "slug": "bebelus",
+        "name": "Bebeluș",
+        "icon": "baby",
+        "description": "Produse dedicate celor mici.",
+        "sort_order": 6,
+    },
+    {
+        "slug": "oferte",
+        "name": "Oferte",
+        "icon": "tag",
+        "description": "Produse urmărite pentru promoții și reduceri.",
+        "sort_order": 7,
+    },
+    {
+        "slug": "chilipiruri",
+        "name": "Chilipiruri",
+        "icon": "badge-percent",
+        "description": "Cele mai bune prețuri și cumpărături inspirate.",
+        "sort_order": 8,
+    },
+]
+
+
+def _apply_watchlist_fields(watchlist, item: dict) -> None:
+    """
+    Populează câmpurile existente pe modelul Watchlist.
+    Funcționează și dacă modelul are doar `name`.
+    """
+    if hasattr(watchlist, "name"):
+        watchlist.name = item["name"]
+
+    if hasattr(watchlist, "slug"):
+        watchlist.slug = item["slug"]
+
+    if hasattr(watchlist, "icon"):
+        watchlist.icon = item["icon"]
+
+    if hasattr(watchlist, "description"):
+        watchlist.description = item["description"]
+
+    if hasattr(watchlist, "sort_order"):
+        watchlist.sort_order = item["sort_order"]
+
+
+def _build_watchlist_payload(Watchlist, item: dict) -> dict:
+    """
+    Construiește payload-ul doar cu câmpurile suportate de model.
+    """
+    payload = {}
+
+    if hasattr(Watchlist, "name"):
+        payload["name"] = item["name"]
+
+    if hasattr(Watchlist, "slug"):
+        payload["slug"] = item["slug"]
+
+    if hasattr(Watchlist, "icon"):
+        payload["icon"] = item["icon"]
+
+    if hasattr(Watchlist, "description"):
+        payload["description"] = item["description"]
+
+    if hasattr(Watchlist, "sort_order"):
+        payload["sort_order"] = item["sort_order"]
+
+    return payload
+
 
 def seed_default_watchlists(session: Session) -> None:
     from app.models import Watchlist
 
-    default_names = [
-        "Săptămânal",
-        "Bebeluș",
-        "Casă",
-        "Electronice",
-    ]
+    all_watchlists = session.exec(select(Watchlist)).all()
 
-    existing_names = set(session.exec(select(Watchlist.name)).all())
+    by_name = {}
+    by_slug = {}
 
-    for name in default_names:
-        if name not in existing_names:
-            session.add(Watchlist(name=name))
+    for watchlist in all_watchlists:
+        name = getattr(watchlist, "name", None)
+        slug = getattr(watchlist, "slug", None)
+
+        if name:
+            by_name[name] = watchlist
+        if slug:
+            by_slug[slug] = watchlist
+
+    for item in DEFAULT_WATCHLISTS:
+        existing = by_slug.get(item["slug"]) or by_name.get(item["name"])
+
+        if existing:
+            _apply_watchlist_fields(existing, item)
+        else:
+            payload = _build_watchlist_payload(Watchlist, item)
+            session.add(Watchlist(**payload))
 
     session.commit()
 

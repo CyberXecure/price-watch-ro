@@ -13,6 +13,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     let detail = "Request failed";
+
     try {
       const data = await response.json();
       detail = data?.detail || data?.message || detail;
@@ -23,6 +24,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
         detail = "Request failed";
       }
     }
+
     throw new Error(detail);
   }
 
@@ -84,6 +86,10 @@ export type WatchlistDetailedItem = {
   created_at: string;
 };
 
+export type BasicHealth = {
+  status: "ok" | "error";
+};
+
 export type RenderedHealth = {
   status: "ok" | "error";
   target: string;
@@ -92,6 +98,14 @@ export type RenderedHealth = {
   websocket_debugger_url: string | null;
   detail: string | null;
 };
+
+export async function getApiHealth(): Promise<BasicHealth> {
+  return apiFetch<BasicHealth>("/health");
+}
+
+export async function getRenderedHealth(): Promise<RenderedHealth> {
+  return apiFetch<RenderedHealth>("/health/rendered");
+}
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   return apiFetch<DashboardSummary>("/dashboard/summary");
@@ -108,9 +122,6 @@ export async function getWatchlistsWithSummary(): Promise<WatchlistSummary[]> {
 export async function getWatchlist(watchlistId: number): Promise<Watchlist> {
   return apiFetch<Watchlist>(`/watchlists/${watchlistId}`);
 }
-
-export async function getRenderedHealth(): Promise<RenderedHealth> {
-  return apiFetch("/health/rendered");
 
 export async function getWatchlistDetailedItems(
   watchlistId: number,
@@ -176,4 +187,3 @@ export async function archiveWatchlistItem(
     is_active: false,
   });
 }
-

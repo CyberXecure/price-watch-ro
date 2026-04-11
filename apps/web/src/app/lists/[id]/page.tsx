@@ -27,17 +27,40 @@ function formatNumeric(value: number | null | undefined): string {
   return value.toFixed(2);
 }
 
-function normalizeUnit(unit: string | null | undefined): string {
+function formatUnitLabel(unit: string | null | undefined): string {
   if (!unit) return "";
-  return unit;
+
+  const raw = unit.trim();
+  if (!raw) return "";
+
+  const normalized = raw.toUpperCase();
+
+  if (normalized.includes("LEI_PER_BUC")) return "buc";
+  if (normalized.includes("LEI_PER_KG")) return "kg";
+  if (normalized.includes("LEI_PER_L")) return "l";
+  if (normalized === "TOTAL") return "total";
+
+  const lower = raw.toLowerCase();
+  if (lower === "lei/buc" || lower === "buc" || lower === "/buc") return "buc";
+  if (lower === "lei/kg" || lower === "kg" || lower === "/kg") return "kg";
+  if (lower === "lei/l" || lower === "l" || lower === "/l") return "l";
+  if (lower === "total") return "total";
+
+  return lower;
 }
 
 function formatComparison(
   value: number | null | undefined,
   unit: string | null | undefined,
 ): string {
-  if (value === null || value === undefined || !unit) return "-";
-  return `${formatNumeric(value)} ${normalizeUnit(unit)}`;
+  if (value === null || value === undefined) return "-";
+
+  const label = formatUnitLabel(unit);
+  if (!label || label === "total") {
+    return `${formatNumeric(value)} lei`;
+  }
+
+  return `${formatNumeric(value)} lei/${label}`;
 }
 
 function formatTarget(
@@ -46,16 +69,12 @@ function formatTarget(
 ): string {
   if (value === null || value === undefined) return "-";
 
-  const cleanedUnit = unit?.trim();
-  if (!cleanedUnit) {
+  const label = formatUnitLabel(unit);
+  if (!label || label === "total") {
     return `${formatNumeric(value)} lei`;
   }
 
-  if (cleanedUnit.startsWith("lei/")) {
-    return `${formatNumeric(value)} ${cleanedUnit}`;
-  }
-
-  return `${formatNumeric(value)} lei/${cleanedUnit}`;
+  return `${formatNumeric(value)} lei/${label}`;
 }
 
 function formatCapturedAt(value: string | null | undefined): string {
@@ -117,11 +136,10 @@ function getComparableDelta(item: WatchlistDetailedItem): number | null {
     return null;
   }
 
-  if (
-    item.target_unit &&
-    item.latest_comparison_unit &&
-    item.target_unit !== item.latest_comparison_unit
-  ) {
+  const targetLabel = formatUnitLabel(item.target_unit);
+  const comparisonLabel = formatUnitLabel(item.latest_comparison_unit);
+
+  if (targetLabel && comparisonLabel && targetLabel !== comparisonLabel) {
     return null;
   }
 
@@ -142,13 +160,19 @@ function getDeltaText(item: WatchlistDetailedItem): string {
   }
 
   const abs = Math.abs(delta);
-  const unit = item.target_unit || item.latest_comparison_unit || "";
+  const label =
+    formatUnitLabel(item.target_unit) ||
+    formatUnitLabel(item.latest_comparison_unit);
 
   if (delta <= 0) {
-    return `${formatNumeric(abs)} lei sub țintă${unit ? ` · ${unit}` : ""}`;
+    return `${formatNumeric(abs)} lei sub țintă${
+      label && label !== "total" ? ` · ${label}` : ""
+    }`;
   }
 
-  return `${formatNumeric(abs)} lei peste țintă${unit ? ` · ${unit}` : ""}`;
+  return `${formatNumeric(abs)} lei peste țintă${
+    label && label !== "total" ? ` · ${label}` : ""
+  }`;
 }
 
 function deltaBadgeClass(delta: number | null): string {
@@ -510,7 +534,9 @@ export default async function WatchlistDetailPage({
                       item.latest_unit_price_unit ? (
                         <div className="mt-2 text-sm text-white/60">
                           Preț unitar: {formatNumeric(item.latest_unit_price_value)}{" "}
-                          lei/{item.latest_unit_price_unit}
+                          {formatUnitLabel(item.latest_unit_price_unit) === "total"
+                            ? "lei"
+                            : `lei/${formatUnitLabel(item.latest_unit_price_unit)}`}
                         </div>
                       ) : (
                         <div className="mt-2 text-sm text-white/35">
@@ -518,10 +544,10 @@ export default async function WatchlistDetailPage({
                         </div>
                       )}
                     </div>
-                       {formatTarget(item.target_price, item.target_unit)}
+
                     <div>
                       <div className="text-lg font-semibold text-white">
-                        
+                        {formatTarget(item.target_price, item.target_unit)}
                       </div>
 
                       <div

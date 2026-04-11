@@ -1,7 +1,6 @@
 import asyncio
-import sys
-
 import re
+import sys
 from typing import Optional
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -27,21 +26,6 @@ def parse_money_to_float(value: Optional[str]) -> Optional[float]:
 
     text = value.strip().replace("\xa0", " ").replace(",", ".")
     match = re.search(r"(\d+(?:\.\d{1,2})?)", text)
-    if not match:
-        return None
-
-    try:
-        return float(match.group(1))
-    except ValueError:
-        return None
-
-
-def parse_percent_to_float(value: Optional[str]) -> Optional[float]:
-    if not value:
-        return None
-
-    text = value.strip().replace(",", ".")
-    match = re.search(r"(\d+(?:\.\d+)?)\s*%", text)
     if not match:
         return None
 
@@ -212,58 +196,61 @@ def extract_main_image_url(page) -> Optional[str]:
     return None
 
 
-def extract_nearby_product_block(page) -> dict:
-    title_locator = page.locator("h1").first
-
-    block_text = ""
-    block_html = ""
-    level = "none"
-
+def extract_main_product_block(page) -> dict:
     js = """
-    (el) => {
-      function safe(node) {
-        if (!node) return null;
-        return {
-          text: (node.innerText || node.textContent || "").slice(0, 5000),
-          html: (node.outerHTML || "").slice(0, 15000),
-          tag: node.tagName,
-          className: node.className || "",
-        };
+    () => {
+      function cleanText(s) {
+        return (s || "").replace(/\\s+/g, " ").trim();
       }
 
-      let current = el;
-      for (let i = 0; i < 6; i++) {
+      const h1 = document.querySelector("h1");
+      if (!h1) {
+        return { block_text: cleanText(document.body.innerText).slice(0, 8000), block_html: "", block_level: "body" };
+      }
+
+      let current = h1;
+      for (let i = 0; i < 8; i++) {
         if (!current) break;
-        const payload = safe(current);
-        if (payload && /Lei|DEALS|SGR|%|Adaugă în coș|Economisești/i.test(payload.text)) {
-          return payload;
+
+        const text = cleanText(current.innerText || current.textContent || "");
+        if (
+          text &&
+          /Lei|Adaugă în coș|Adauga in cos|Economisești|economisesti|%/i.test(text) &&
+          text.length < 12000
+        ) {
+          return {
+            block_text: text,
+            block_html: (current.outerHTML || "").slice(0, 20000),
+            block_level: `${current.tagName} ${current.className || ""}`.trim(),
+          };
         }
+
         current = current.parentElement;
       }
-      return safe(el);
+
+      return {
+        block_text: cleanText(document.body.innerText).slice(0, 8000),
+        block_html: "",
+        block_level: "body",
+      };
     }
     """
 
     try:
-        data = title_locator.evaluate(js)
-        if data:
-            block_text = clean_text(data.get("text")) or ""
-            block_html = data.get("html") or ""
-            level = f"{data.get('tag')} {data.get('className')}"
+        return page.evaluate(js)
     except Exception:
-        pass
-
-    return {
-        "block_text": block_text,
-        "block_html": block_html,
-        "block_level": level,
-    }
+        body_text = clean_text(page.locator("body").inner_text(timeout=4000)) or ""
+        return {
+            "block_text": body_text[:8000],
+            "block_html": "",
+            "block_level": "body",
+        }
 
 
 def extract_money_candidates(text: str) -> list[float]:
     values: list[float] = []
 
-    for match in re.finditer(r"(\d+(?:[.,]\d{1,2})?)\s*Lei", text, re.IGNORECASE):
+    for match in re.finditer(r"(\d+(?:[.,]\d{1,2})?)\s*Lei(?!\s*/\s*(?:l|kg|buc))", text, re.IGNORECASE):
         raw_value = match.group(1)
 
         try:
@@ -271,11 +258,16 @@ def extract_money_candidates(text: str) -> list[float]:
         except ValueError:
             continue
 
-        start = max(0, match.start() - 12)
-        prefix = text[start:match.start()]
-        if "+" in prefix:
-            continue
+        start = max(0, match.start() - 24)
+        end = min(len(text), match.end() + 40)
+        context = text[start:end].lower()
 
+        if "+" in context:
+            continue
+        if re.search(r"\b\d+\s*buc\b", context):
+            continue
+        if re.search(r"adaugă în coș|adauga in cos", context):
+            continue
         if 0.5 <= value <= 500:
             values.append(value)
 
@@ -334,9 +326,34 @@ def detect_unit_price(text: str) -> tuple[Optional[float], Optional[str]]:
     return parsed_values[0]
 
 
+def choose_rendered_price_total(
+    *,
+    unit_price_value: Optional[float],
+    measure_type: str,
+    measure_value: Optional[float],
+    candidates: list[float],
+    discount_percent: Optional[float],
+) -> tuple[Optional[float], Optional[float]]:
+    current, old = pick_best_price_pair(candidates, discount_percent)
+
+    if (
+        unit_price_value is not None
+        and measure_type in {"count", "weight", "volume"}
+        and measure_value
+        and candidates
+    ):
+        implied_total = round(unit_price_value * measure_value, 2)
+        nearest = min(candidates, key=lambda x: abs(x - implied_total))
+        if abs(nearest - implied_total) <= 0.25:
+            old_price = old if old and old > nearest else None
+            return nearest, old_price
+
+    return current, old
+
+
 def detect_rendered_price_block(page) -> dict:
     body_text = clean_text(page.locator("body").inner_text(timeout=4000)) or ""
-    nearby = extract_nearby_product_block(page)
+    nearby = extract_main_product_block(page)
 
     target_text = nearby["block_text"] or body_text
 
@@ -344,24 +361,34 @@ def detect_rendered_price_block(page) -> dict:
     brand = extract_brand(page, title=title, url=page.url)
     image_url = extract_main_image_url(page)
 
+    package_text = extract_package_from_title(title)
+    measure_type, measure_value, measure_unit = infer_measure_from_package(package_text)
+
     discount_percent = detect_discount_percent(target_text) or detect_discount_percent(body_text)
     promo_label = detect_promo_label(target_text) or detect_promo_label(body_text)
     deposit_value = detect_deposit_value(target_text) or detect_deposit_value(body_text)
-
-    money_candidates = extract_money_candidates(target_text)
-    if not money_candidates:
-        money_candidates = extract_money_candidates(body_text)
-
-    price_total, old_price = pick_best_price_pair(money_candidates, discount_percent)
 
     unit_price_value, unit_price_unit = detect_unit_price(target_text)
     if unit_price_value is None:
         unit_price_value, unit_price_unit = detect_unit_price(body_text)
 
+    money_candidates = extract_money_candidates(target_text)
+    if not money_candidates:
+        money_candidates = extract_money_candidates(body_text)
+
+    price_total, old_price = choose_rendered_price_total(
+        unit_price_value=unit_price_value,
+        measure_type=measure_type,
+        measure_value=measure_value,
+        candidates=money_candidates,
+        discount_percent=discount_percent,
+    )
+
     return {
         "title": title,
         "brand": brand,
         "image_url": image_url,
+        "package_text": package_text,
         "price_total": price_total,
         "old_price": old_price,
         "promo_label": promo_label,
@@ -369,6 +396,9 @@ def detect_rendered_price_block(page) -> dict:
         "deposit_value": deposit_value,
         "unit_price_value": unit_price_value,
         "unit_price_unit": unit_price_unit,
+        "base_measure_type": measure_type,
+        "base_measure_value": measure_value,
+        "base_measure_unit": measure_unit,
         "money_candidates": money_candidates[:50],
         "target_text": target_text[:5000],
         "body_text": body_text[:5000],
@@ -405,16 +435,12 @@ def parse_freshful_product_rendered(url: str) -> dict:
                 page.close()
             except Exception:
                 pass
-            # IMPORTANT:
-            # Nu închidem browserul conectat prin CDP.
-            # Browserul este un Chrome extern pornit separat cu remote debugging.
-            # browser.close() poate arunca NotImplementedError în acest scenariu.
 
     title = clean_product_title(rendered.get("title"))
     brand = clean_text(rendered.get("brand")) or extract_brand_from_url(url) or infer_brand_from_title(title)
     image_url = rendered.get("image_url")
 
-    package_text = extract_package_from_title(title)
+    package_text = rendered.get("package_text") or extract_package_from_title(title)
     measure_type, measure_value, measure_unit = infer_measure_from_package(package_text)
 
     price_total = rendered.get("price_total")

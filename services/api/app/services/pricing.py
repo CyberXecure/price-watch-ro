@@ -1,161 +1,213 @@
-from datetime import datetime
-
-from sqlmodel import Session, select
-
-from app.models import AlertEvent, WatchlistItem
-
-from enum import Enum
-
-def normalize_comparison_unit(unit) -> str | None:
-    if unit is None:
-        return None
-
-    # dacă vine enum Python, folosim .name / .value, nu str(enum)
-    if isinstance(unit, Enum):
-        raw_name = getattr(unit, "name", None)
-        raw_value = getattr(unit, "value", None)
-
-        if raw_name in {"LEI_PER_L", "LEI_PER_KG", "LEI_PER_BUC", "TOTAL"}:
-            return raw_name
-
-        if isinstance(raw_value, str):
-            value = raw_value.strip().lower()
-        else:
-            value = str(raw_value).strip().lower()
-    else:
-        value = str(unit).strip().lower()
-
-    mapping = {
-        "lei/l": "LEI_PER_L",
-        "lei/kg": "LEI_PER_KG",
-        "lei/buc": "LEI_PER_BUC",
-        "total": "TOTAL",
-        "lei_per_l": "LEI_PER_L",
-        "lei_per_kg": "LEI_PER_KG",
-        "lei_per_buc": "LEI_PER_BUC",
-        "comparisonunit.lei_per_l": "LEI_PER_L",
-        "comparisonunit.lei_per_kg": "LEI_PER_KG",
-        "comparisonunit.lei_per_buc": "LEI_PER_BUC",
-        "comparisonunit.total": "TOTAL",
-        "LEI_PER_L".lower(): "LEI_PER_L",
-        "LEI_PER_KG".lower(): "LEI_PER_KG",
-        "LEI_PER_BUC".lower(): "LEI_PER_BUC",
-        "TOTAL".lower(): "TOTAL",
-    }
-
-    return mapping.get(value, value.upper())
-
-def pick_comparison(
-    price_total,
-    unit_price_value,
-    unit_price_unit,
-):
-    if unit_price_value is not None and unit_price_unit:
-        normalized_unit = str(unit_price_unit).strip().lower()
-
-        if normalized_unit == "l":
-            return unit_price_value, "LEI_PER_L"
-        if normalized_unit == "kg":
-            return unit_price_value, "LEI_PER_KG"
-        if normalized_unit == "buc":
-            return unit_price_value, "LEI_PER_BUC"
-
-    if price_total is not None:
-        return price_total, "TOTAL"
-
-    return None, None
-
-
-def status_label(status: str | None) -> str:
-    value = (status or "normal").strip().lower()
-
-    if value == "best_buy":
-        return "Chilipir"
-    if value == "high_price":
-        return "Răsfăț"
-    return "Preț cinstit"
-
-
-def _normalize_status(status: str | None) -> str:
-    value = (status or "normal").strip().lower()
-    if value in {"best_buy", "normal", "high_price"}:
-        return value
-    return "normal"
-
-
-def _evaluate_status(
-    target_price,
-    target_unit,
-    comparison_price,
-    comparison_unit,
-) -> str:
-    if target_price is None:
-        return "normal"
-
-    normalized_target_unit = normalize_comparison_unit(target_unit)
-    normalized_comparison_unit = normalize_comparison_unit(comparison_unit)
-
-    if comparison_price is None or not normalized_comparison_unit:
-        return "normal"
-
-    if normalized_target_unit and normalized_target_unit != normalized_comparison_unit:
-        return "normal"
-
-    if comparison_price <= target_price:
-        return "best_buy"
-
-    return "high_price"
-
-
-def evaluate_and_create_alerts_for_product(
-    session: Session,
-    product,
-    comparison_price,
-    comparison_unit,
-):
-    normalized_comparison_unit = normalize_comparison_unit(comparison_unit)
-
-    items = session.exec(
-        select(WatchlistItem).where(
-            WatchlistItem.store_product_id == product.id,
-            WatchlistItem.is_active == True,  # noqa: E712
-        )
-    ).all()
-
-    for watchlist_item in items:
-        old_status = _normalize_status(watchlist_item.current_status)
-        new_status = _evaluate_status(
-            target_price=watchlist_item.target_price,
-            target_unit=watchlist_item.target_unit,
-            comparison_price=comparison_price,
-            comparison_unit=normalized_comparison_unit,
-        )
-
-        if new_status == old_status:
-            continue
-
-        watchlist_item.current_status = new_status
-        if watchlist_item.target_unit:
-            watchlist_item.target_unit = normalize_comparison_unit(watchlist_item.target_unit)
-
-        session.add(watchlist_item)
-
-        if watchlist_item.store_product_id is None:
-            continue
-
-        old_label = status_label(old_status)
-        new_label = status_label(new_status)
-        message = f"Status schimbat: {old_label} -> {new_label}"
-
-        event = AlertEvent(
-            watchlist_item_id=watchlist_item.id,
-            store_product_id=watchlist_item.store_product_id,
-            triggered_at=datetime.utcnow(),
-            old_status=old_status.upper(),
-            new_status=new_status.upper(),
-            comparison_price=comparison_price,
-            comparison_unit=normalized_comparison_unit,
-            message=message,
-            is_read=False,
-        )
-        session.add(event)
+from __future__ import annotations  
+  
+from typing import Optional  
+  
+from sqlmodel import Session  
+  
+from app.models import AlertEvent, WatchlistItem  
+  
+  
+def normalize_unit(unit: Optional[str]) -> Optional[str]:  
+    if unit is None:  
+        return None  
+  
+    value = str(unit).strip().lower()  
+    if not value:  
+        return None  
+  
+    if value.startswith("lei/"):  
+        value = value[4:]  
+  
+    aliases = {  
+        "l": "l",  
+        "litru": "l",  
+        "litri": "l",  
+        "kg": "kg",  
+        "kilogram": "kg",  
+        "kilograme": "kg",  
+        "g": "g",  
+        "gram": "g",  
+        "grame": "g",  
+        "buc": "buc",  
+        "buc.": "buc",  
+        "bucata": "buc",  
+        "bucati": "buc",  
+        "bucată": "buc",  
+        "bucăți": "buc",  
+    }  
+  
+    return aliases.get(value, value)  
+  
+  
+def normalize_comparison_unit(unit: Optional[str]) -> Optional[str]:  
+    return normalize_unit(unit)  
+  
+  
+def pick_comparison(  
+    *,  
+    unit_price_value: float | None = None,  
+    unit_price_unit: str | None = None,  
+    comparison_price: float | None = None,  
+    comparison_unit: str | None = None,  
+    current_comparison_price: float | None = None,  
+    current_comparison_unit: str | None = None,  
+    price_total: float | None = None,  
+    **_: object,  
+):  
+    value = (  
+        unit_price_value  
+        if unit_price_value is not None  
+        else comparison_price  
+        if comparison_price is not None  
+        else current_comparison_price  
+    )  
+  
+    unit = (  
+        unit_price_unit  
+        if unit_price_unit is not None  
+        else comparison_unit  
+        if comparison_unit is not None  
+        else current_comparison_unit  
+    )  
+  
+    if value is None:  
+        value = price_total  
+  
+    return value, normalize_comparison_unit(unit)  
+  
+  
+def status_label(status: Optional[str]) -> str:  
+    mapping = {  
+        "BEST_BUY": "Chilipir",  
+        "FAIR_PRICE": "Preț cinstit",  
+        "HIGH_PRICE": "Răsfăț",  
+        "NORMAL": "Preț cinstit",  
+    }  
+    return mapping.get((status or "").upper(), "Preț cinstit")  
+  
+  
+def classify_price_status(  
+    *,  
+    target_price: float | None,  
+    target_unit: str | None,  
+    comparison_price: float | None = None,  
+    comparison_unit: str | None = None,  
+    current_comparison_price: float | None = None,  
+    current_comparison_unit: str | None = None,  
+    **_: object,  
+) -> str:  
+    resolved_price = (  
+        comparison_price  
+        if comparison_price is not None  
+        else current_comparison_price  
+    )  
+    resolved_unit = (  
+        comparison_unit  
+        if comparison_unit is not None  
+        else current_comparison_unit  
+    )  
+  
+    if (  
+        target_price is None  
+        or resolved_price is None  
+        or target_price <= 0  
+        or resolved_price <= 0  
+    ):  
+        return "FAIR_PRICE"  
+  
+    normalized_target_unit = normalize_unit(target_unit)  
+    normalized_comparison = normalize_comparison_unit(resolved_unit)  
+  
+    if normalized_target_unit and normalized_comparison:  
+        if normalized_target_unit != normalized_comparison:  
+            return "FAIR_PRICE"  
+  
+    if resolved_price <= target_price:  
+        return "BEST_BUY"  
+  
+    return "HIGH_PRICE"  
+  
+  
+def maybe_create_status_change_event(  
+    *,  
+    session: Session,  
+    watchlist_item: WatchlistItem,  
+    old_status: str | None,  
+    new_status: str | None,  
+    old_price: float | None = None,  
+    new_price: float | None = None,  
+) -> AlertEvent | None:  
+    normalized_old = old_status.upper() if old_status else None  
+    normalized_new = new_status.upper() if new_status else None  
+  
+    if not normalized_new:  
+        return None  
+  
+    if normalized_old == normalized_new:  
+        return None  
+  
+    old_label = status_label(normalized_old)  
+    new_label = status_label(normalized_new)  
+    message = f"Status schimbat: {old_label} -> {new_label}"  
+  
+    event = AlertEvent(  
+        watchlist_id=watchlist_item.watchlist_id,  
+        watchlist_item_id=watchlist_item.id,  
+        store_product_id=watchlist_item.store_product_id,  
+        event_type="STATUS_CHANGED",  
+        message=message,  
+        old_status=normalized_old,  
+        new_status=normalized_new,  
+        old_price=old_price,  
+        new_price=new_price,  
+    )  
+    session.add(event)  
+    return event  
+  
+  
+def evaluate_and_create_alerts_for_product(  
+    *,  
+    session: Session,  
+    watchlist_item: WatchlistItem,  
+    old_status: str | None = None,  
+    new_status: str | None = None,  
+    old_price: float | None = None,  
+    new_price: float | None = None,  
+    comparison_price: float | None = None,  
+    comparison_unit: str | None = None,  
+    current_comparison_price: float | None = None,  
+    current_comparison_unit: str | None = None,  
+    unit_price_value: float | None = None,  
+    unit_price_unit: str | None = None,  
+    price_total: float | None = None,  
+    **_: object,  
+) -> AlertEvent | None:  
+    resolved_comparison_price, resolved_comparison_unit = pick_comparison(  
+        unit_price_value=unit_price_value,  
+        unit_price_unit=unit_price_unit,  
+        comparison_price=comparison_price,  
+        comparison_unit=comparison_unit,  
+        current_comparison_price=current_comparison_price,  
+        current_comparison_unit=current_comparison_unit,  
+        price_total=price_total,  
+    )  
+  
+    resolved_new_status = new_status  
+    if resolved_new_status is None:  
+        resolved_new_status = classify_price_status(  
+            target_price=watchlist_item.target_price,  
+            target_unit=watchlist_item.target_unit,  
+            comparison_price=resolved_comparison_price,  
+            comparison_unit=resolved_comparison_unit,  
+        )  
+  
+    resolved_old_status = old_status or "FAIR_PRICE"  
+  
+    return maybe_create_status_change_event(  
+        session=session,  
+        watchlist_item=watchlist_item,  
+        old_status=resolved_old_status,  
+        new_status=resolved_new_status,  
+        old_price=old_price,  
+        new_price=new_price,  
+    )  
