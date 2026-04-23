@@ -560,6 +560,63 @@ def _apply_rendered_promo_safely(
             merged_parsed.get("promo_label"),
         )
 
+    bundle_kind = _first_non_empty(
+        static_parsed.get("promo_kind"),
+        rendered_parsed.get("promo_kind"),
+        merged_parsed.get("promo_kind"),
+    )
+
+    if bundle_kind == "bundle":
+        safe["promo_kind"] = "bundle"
+        safe["price_total"] = _first_non_empty(
+            static_parsed.get("price_total"),
+            merged_parsed.get("price_total"),
+        )
+        safe["old_price"] = _first_non_empty(
+            static_parsed.get("old_price"),
+            merged_parsed.get("old_price"),
+        )
+        safe["unit_price_value"] = _first_non_empty(
+            static_parsed.get("unit_price_value"),
+            merged_parsed.get("unit_price_value"),
+        )
+        safe["unit_price_unit"] = _first_non_empty(
+            static_parsed.get("unit_price_unit"),
+            merged_parsed.get("unit_price_unit"),
+        )
+        safe["promo_label"] = _first_non_empty(
+            static_parsed.get("promo_label"),
+            rendered_parsed.get("promo_label"),
+            merged_parsed.get("promo_label"),
+            "OFERTĂ",
+        )
+        safe["discount_percent"] = _first_non_empty(
+            static_parsed.get("discount_percent"),
+            rendered_parsed.get("discount_percent"),
+            merged_parsed.get("discount_percent"),
+        )
+
+    safe["price_total"] = _first_non_empty(
+        static_parsed.get("price_total"),
+        merged_parsed.get("price_total"),
+        safe.get("price_total"),
+    )
+    safe["unit_price_value"] = _first_non_empty(
+        static_parsed.get("unit_price_value"),
+        merged_parsed.get("unit_price_value"),
+        safe.get("unit_price_value"),
+    )
+    safe["unit_price_unit"] = _first_non_empty(
+        static_parsed.get("unit_price_unit"),
+        merged_parsed.get("unit_price_unit"),
+        safe.get("unit_price_unit"),
+    )
+    safe["old_price"] = _first_non_empty(
+        static_parsed.get("old_price"),
+        merged_parsed.get("old_price"),
+        safe.get("old_price"),
+    )
+
     return safe, checks
 
 
