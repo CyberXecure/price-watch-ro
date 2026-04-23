@@ -1,32 +1,31 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import WatchlistItemActiveToggle from "@/components/watchlist-item-active-toggle";
-import { archiveWatchlistItem } from "@/lib/api";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE?.trim() || "http://127.0.0.1:8000";
+import { API_BASE_URL, archiveWatchlistItem, getPromoEngineHealth } from "@/lib/api";
 
 type Props = {
   watchlistId: number;
   itemId: number;
   productUrl: string;
   isActive: boolean;
+  onChanged?: () => Promise<void> | void;
 };
 
 function normalizeRefreshError(message: string): string {
   const text = message.toLowerCase();
 
   if (
-    text.includes("9222") ||
     text.includes("connect_econnrefused") ||
     text.includes("connect econnrefused") ||
     text.includes("connect_over_cdp") ||
     text.includes("browsertype.connect_over_cdp") ||
-    text.includes("websocket")
+    text.includes("websocket") ||
+    text.includes("browser") ||
+    text.includes("rendered")
   ) {
-    return "Motorul pentru actualizarea promo nu este disponibil acum. Pornește sesiunea locală completă și încearcă din nou.";
+    return "Motorul pentru actualizarea promo nu este disponibil acum. Încearcă din nou după pornirea completă a aplicației.";
   }
 
   if (text.includes("missing price_total")) {
@@ -41,6 +40,7 @@ export default function WatchlistItemActions({
   itemId,
   productUrl,
   isActive,
+  onChanged,
 }: Props) {
   const router = useRouter();
 
@@ -48,6 +48,35 @@ export default function WatchlistItemActions({
   const [isRefreshingRendered, setIsRefreshingRendered] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [promoEngineAvailable, setPromoEngineAvailable] = useState<boolean>(false);
+  const [promoEngineDetail, setPromoEngineDetail] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPromoEngineHealth() {
+      try {
+        const health = await getPromoEngineHealth();
+        if (cancelled) return;
+
+        setPromoEngineAvailable(health.status === "ok");
+        setPromoEngineDetail(health.detail ?? null);
+      } catch (err) {
+        if (cancelled) return;
+
+        setPromoEngineAvailable(false);
+        setPromoEngineDetail(
+          err instanceof Error ? err.message : "Motor promo indisponibil",
+        );
+      }
+    }
+
+    loadPromoEngineHealth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function runRefresh(mode: "static" | "rendered") {
     try {
@@ -78,13 +107,16 @@ export default function WatchlistItemActions({
           const data = await response.json();
           detail = data?.detail || detail;
         } catch {
-          // păstrăm mesajul fallback
         }
 
         throw new Error(detail);
       }
 
-      router.refresh();
+      if (onChanged) {
+        await onChanged();
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       const rawMessage =
         err instanceof Error ? err.message : "Actualizarea a eșuat";
@@ -106,7 +138,11 @@ export default function WatchlistItemActions({
       setError(null);
       setIsArchiving(true);
       await archiveWatchlistItem(watchlistId, itemId);
-      router.refresh();
+      if (onChanged) {
+        await onChanged();
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Acțiunea a eșuat");
     } finally {
@@ -135,10 +171,14 @@ export default function WatchlistItemActions({
         <button
           type="button"
           onClick={() => runRefresh("rendered")}
-          disabled={isBusy}
+          disabled={isBusy || !promoEngineAvailable}
           className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1.5 text-xs font-medium text-fuchsia-200 transition hover:bg-fuchsia-500/20 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isRefreshingRendered ? "Actualizez promo..." : "Actualizează promo"}
+          {isRefreshingRendered
+            ? "Actualizez promo..."
+            : promoEngineAvailable
+              ? "Actualizează promo"
+              : "Motor promo indisponibil"}
         </button>
 
         <a
@@ -171,6 +211,12 @@ export default function WatchlistItemActions({
       {error ? (
         <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
           {error}
+        </div>
+      ) : null}
+
+      {!promoEngineAvailable && promoEngineDetail ? (
+        <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          {promoEngineDetail}
         </div>
       ) : null}
     </div>

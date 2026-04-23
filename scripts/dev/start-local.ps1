@@ -2,11 +2,11 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir "..\..\"))
+
 $ApiDir = Join-Path $ProjectRoot "services\api"
 $WebDir = Join-Path $ProjectRoot "apps\web"
 
-$ChromeProfile = Join-Path $env:TEMP "price-watch-ro-chrome"
-$ResetChromeProfile = $false
+$ChromeProfile = "D:\dev\chrome-freshful-debug"
 $ChromeCdpUrl = "http://127.0.0.1:9222/json/version"
 
 function Get-ChromePath {
@@ -22,16 +22,6 @@ function Get-ChromePath {
     }
 
     return $null
-}
-
-function Get-ShellPath {
-    $pwsh = (Get-Command pwsh.exe -ErrorAction SilentlyContinue).Source
-    if ($pwsh) { return $pwsh }
-
-    $powershell = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
-    if ($powershell) { return $powershell }
-
-    throw "Nu am găsit nici pwsh.exe, nici powershell.exe."
 }
 
 function Test-TcpPort {
@@ -99,7 +89,7 @@ function Test-HttpOk {
     )
 
     try {
-        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 2
+        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 3
         return ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400)
     }
     catch {
@@ -134,142 +124,112 @@ function Wait-HttpOk {
     return $false
 }
 
-function Show-PortUsage {
+function Stop-ProcessesOnPorts {
     param(
         [Parameter(Mandatory = $true)]
         [int[]]$Ports
     )
 
     foreach ($port in $Ports) {
-        $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($conn) {
-            Write-Warning "Portul $port este deja ocupat de PID $($conn.OwningProcess)."
-        }
-        else {
-            Write-Host "Portul $port este liber."
+        $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+        foreach ($connection in $connections) {
+            try {
+                Stop-Process -Id $connection.OwningProcess -Force -ErrorAction Stop
+                Write-Host "Am oprit PID $($connection.OwningProcess) de pe portul $port."
+            }
+            catch {
+                Write-Warning "Nu am putut opri PID $($connection.OwningProcess) de pe portul $port."
+            }
         }
     }
 }
 
-function Stop-ChromeDebugProfile {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ProfilePath
-    )
-
-    $escapedProfile = [Regex]::Escape($ProfilePath)
-
-    $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-        $_.CommandLine -and
-        $_.Name -match '^(chrome|msedge)\.exe$' -and
-        $_.CommandLine -match '--remote-debugging-port=9222' -and
-        $_.CommandLine -match $escapedProfile
+function Test-PromoEngineCdp {
+    try {
+        $result = Invoke-RestMethod -Uri $ChromeCdpUrl -Method Get -TimeoutSec 3
+        return ($null -ne $result.webSocketDebuggerUrl)
     }
+    catch {
+        return $false
+    }
+}
 
-    if (-not $procs) {
-        Write-Host "Nu există browser debug price-watch-ro de oprit."
+function Ensure-ChromeCdp {
+    if (Test-PromoEngineCdp) {
+        Write-Host "[OK] Chrome CDP deja disponibil pe 9222."
         return
     }
 
-    foreach ($proc in ($procs | Sort-Object ProcessId -Unique)) {
-        Write-Host "Oprire browser debug stale -> PID $($proc.ProcessId) [$($proc.Name)]"
-        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+    $chromePath = Get-ChromePath
+    if (-not $chromePath) {
+        throw "Nu am găsit chrome.exe."
     }
 
-    Start-Sleep -Seconds 1
-}
-
-function Start-ChromeDebug {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ChromePath,
-
-        [Parameter(Mandatory = $true)]
-        [string]$ProfilePath
-    )
-
-    if ($ResetChromeProfile -and (Test-Path $ProfilePath)) {
-        try {
-            Remove-Item -Path $ProfilePath -Recurse -Force -ErrorAction Stop
-            Write-Host "Profilul Chrome de debug a fost resetat: $ProfilePath"
-        }
-        catch {
-            Write-Warning "Nu am putut șterge profilul Chrome de debug. Închide browserul pornit pe acest profil și rulează din nou scriptul."
-        }
-    }
-
-    $chromeArgs = @(
+    Write-Host "Pornesc Chrome cu remote debugging pe 9222..."
+    Start-Process -FilePath $chromePath -ArgumentList @(
         "--remote-debugging-port=9222",
-        "--user-data-dir=$ProfilePath",
+        "--user-data-dir=$ChromeProfile",
         "--lang=ro",
         "--accept-lang=ro-RO,ro"
-    )
+    ) | Out-Null
 
-    Start-Process -FilePath $ChromePath -ArgumentList $chromeArgs | Out-Null
-    Write-Host "Chrome pornit cu remote debugging pe 9222, în limba română."
+    [void](Wait-HttpOk -Url $ChromeCdpUrl -TimeoutSeconds 15 -Label "Chrome CDP")
+}
+
+function Stop-WebDevProcesses {
+    Write-Host "=== Curăț procese frontend vechi (3000 / 3001) ==="
+    Stop-ProcessesOnPorts -Ports @(3000, 3001)
+
+    $lockPath = Join-Path $WebDir ".next\dev\lock"
+    if (Test-Path $lockPath) {
+        Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
+        Write-Host "Am șters lock-ul Next.js: $lockPath"
+    }
 }
 
 Write-Host "=== START price-watch-ro ==="
-Show-PortUsage -Ports @(9222, 8000, 3000)
 
-$ShellPath = Get-ShellPath
-
-$chromePath = Get-ChromePath
-if (-not $chromePath) {
-    Write-Warning "Chrome nu a fost găsit automat. Pentru refresh rendered, pornește-l manual cu --remote-debugging-port=9222 --lang=ro --accept-lang=ro-RO,ro."
-}
-else {
-    $port9222Open = Test-TcpPort -HostName "127.0.0.1" -Port 9222
-    $cdpHealthy = Test-HttpOk -Url $ChromeCdpUrl
-
-    if ($cdpHealthy) {
-        Write-Host "[OK] Există deja un browser debug activ și valid pe 9222. Nu pornesc alt Chrome."
-    }
-    elseif ($port9222Open) {
-        Write-Warning "Portul 9222 este ocupat, dar CDP nu răspunde. Repornez sesiunea Chrome de debug."
-        Stop-ChromeDebugProfile -ProfilePath $ChromeProfile
-        Start-ChromeDebug -ChromePath $chromePath -ProfilePath $ChromeProfile
-        [void](Wait-HttpOk -Url $ChromeCdpUrl -TimeoutSeconds 15 -Label "Chrome CDP")
-    }
-    else {
-        Start-ChromeDebug -ChromePath $chromePath -ProfilePath $ChromeProfile
-        [void](Wait-HttpOk -Url $ChromeCdpUrl -TimeoutSeconds 15 -Label "Chrome CDP")
-    }
-}
+Ensure-ChromeCdp
 
 $apiPython = Join-Path $ApiDir ".venv\Scripts\python.exe"
 if (-not (Test-Path $apiPython)) {
-    $apiPython = "python"
-    Write-Warning "Nu am găsit .venv local pentru API. Folosesc python din PATH."
+    throw "Nu am găsit Python-ul din venv: $apiPython"
 }
 
-$apiCommand = "Set-Location '$ApiDir'; & '$apiPython' -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload"
+Write-Host "=== Curăț API vechi (18400) ==="
+Stop-ProcessesOnPorts -Ports @(18400)
 
-$apiProcess = Start-Process -FilePath $ShellPath -ArgumentList @(
-    "-NoExit",
-    "-Command",
-    $apiCommand
-) -PassThru
+$apiProcess = Start-Process -FilePath $apiPython -ArgumentList @(
+    ".\run-desktop.py"
+) -WorkingDirectory $ApiDir -PassThru
 
-Write-Host "API shell pornit. PID launcher: $($apiProcess.Id)"
-[void](Wait-HttpOk -Url "http://127.0.0.1:8000/health" -TimeoutSeconds 25 -Label "API")
+Write-Host "API pornit. PID: $($apiProcess.Id)"
+[void](Wait-HttpOk -Url "http://127.0.0.1:18400/health" -TimeoutSeconds 25 -Label "API")
 
-$webCommand = "Set-Location '$WebDir'; `$env:NEXT_PUBLIC_API_BASE='http://127.0.0.1:8000'; npm run dev"
+Stop-WebDevProcesses
 
-$webProcess = Start-Process -FilePath $ShellPath -ArgumentList @(
-    "-NoExit",
-    "-Command",
-    $webCommand
-) -PassThru
+$npmCmd = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+if (-not $npmCmd) {
+    throw "Nu am găsit npm.cmd în PATH."
+}
 
-Write-Host "Web shell pornit. PID launcher: $($webProcess.Id)"
-[void](Wait-TcpPort -HostName "127.0.0.1" -Port 3000 -TimeoutSeconds 30 -Label "Web")
+$webProcess = Start-Process -FilePath $npmCmd -ArgumentList @(
+    "run",
+    "dev"
+) -WorkingDirectory $WebDir -Environment @{
+    NEXT_PUBLIC_API_BASE = "http://127.0.0.1:18400"
+} -PassThru
+
+Write-Host "Web pornit. PID: $($webProcess.Id)"
+if (-not (Wait-TcpPort -HostName "127.0.0.1" -Port 3000 -TimeoutSeconds 20 -Label "Web 3000")) {
+    [void](Wait-TcpPort -HostName "127.0.0.1" -Port 3001 -TimeoutSeconds 15 -Label "Web 3001")
+}
 
 Write-Host ""
 Write-Host "=== REZUMAT ==="
-Write-Host "API:    http://127.0.0.1:8000"
-Write-Host "Health: http://127.0.0.1:8000/health"
-Write-Host "Rendered: http://127.0.0.1:8000/health/rendered"
-Write-Host "Web:    http://localhost:3000"
-Write-Host "CDP:    http://127.0.0.1:9222/json/version"
-Write-Host "Chrome debug profile: $ChromeProfile"
+Write-Host "API:         http://127.0.0.1:18400"
+Write-Host "Health:      http://127.0.0.1:18400/health"
+Write-Host "PromoEngine: http://127.0.0.1:18400/health/promo-engine"
+Write-Host "Web:         http://localhost:3000 sau http://localhost:3001"
+Write-Host "CDP:         $ChromeCdpUrl"
+Write-Host "Chrome profile: $ChromeProfile"

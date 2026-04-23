@@ -1,4 +1,4 @@
-const API_BASE_URL =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE?.trim() || "http://127.0.0.1:8000";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -29,6 +29,25 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return response.json();
+}
+
+export async function waitForApiReady(
+  attempts: number = 12,
+  delayMs: number = 500,
+): Promise<void> {
+  let lastError: unknown = null;
+
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      await getApiHealth();
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("API not ready");
 }
 
 export type DashboardSummary = {
@@ -78,7 +97,9 @@ export type WatchlistDetailedItem = {
   latest_old_price?: number | null;
   latest_promo_label?: string | null;
   latest_discount_percent?: number | null;
+  latest_promo_kind?: string | null;
   latest_deposit_value?: number | null;
+  latest_availability?: string | null;
   latest_captured_at: string | null;
   notify_best_buy: boolean;
   notify_high_price: boolean;
@@ -99,12 +120,26 @@ export type RenderedHealth = {
   detail: string | null;
 };
 
+export type PromoEngineHealth = {
+  status: "ok" | "error";
+  mode: "external" | "internal" | "disabled";
+  detail: string | null;
+  target: string | null;
+  websocket_debugger_url: string | null;
+  browser: string | null;
+  last_checked_at: string | null;
+};
+
 export async function getApiHealth(): Promise<BasicHealth> {
   return apiFetch<BasicHealth>("/health");
 }
 
 export async function getRenderedHealth(): Promise<RenderedHealth> {
   return apiFetch<RenderedHealth>("/health/rendered");
+}
+
+export async function getPromoEngineHealth(): Promise<PromoEngineHealth> {
+  return apiFetch<PromoEngineHealth>("/health/promo-engine");
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
@@ -187,3 +222,23 @@ export async function archiveWatchlistItem(
     is_active: false,
   });
 }
+
+export async function deleteWatchlist(watchlistId: number) {
+  return apiFetch(`/watchlists/${watchlistId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function updateWatchlist(
+  watchlistId: number,
+  payload: { name: string },
+) {
+  return apiFetch(`/watchlists/${watchlistId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+
+
+

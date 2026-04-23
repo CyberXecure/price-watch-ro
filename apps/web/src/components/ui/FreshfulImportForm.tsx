@@ -6,7 +6,15 @@ import { importFreshfulUrl } from "@/lib/api";
 
 type MessageTone = "success" | "error" | null;
 
-export function FreshfulImportForm({ watchlistId }: { watchlistId: number }) {
+type FreshfulImportFormProps = {
+  watchlistId: number;
+  onImported?: () => Promise<void> | void;
+};
+
+export function FreshfulImportForm({
+  watchlistId,
+  onImported,
+}: FreshfulImportFormProps) {
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [targetPrice, setTargetPrice] = useState("");
@@ -38,9 +46,16 @@ export function FreshfulImportForm({ watchlistId }: { watchlistId: number }) {
       setMessageTone("success");
       setUrl("");
       setTargetPrice("");
-      router.refresh();
+
+      if (onImported) {
+        await onImported();
+      } else {
+        router.refresh();
+      }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Eroare la import");
+      setMessage(
+        error instanceof Error ? error.message : "Importul nu a putut fi finalizat.",
+      );
       setMessageTone("error");
     } finally {
       setLoading(false);
@@ -78,7 +93,7 @@ export function FreshfulImportForm({ watchlistId }: { watchlistId: number }) {
           disabled={loading}
           className="inline-flex items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/15 px-5 py-3 text-sm font-medium text-blue-100 shadow-sm transition hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? "Import..." : "Importă"}
+          {loading ? "Se importă produsul..." : "Importă"}
         </button>
       </div>
 

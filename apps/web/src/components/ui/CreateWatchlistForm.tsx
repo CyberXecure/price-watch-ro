@@ -9,24 +9,31 @@ export function CreateWatchlistForm() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<"success" | "error" | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
+    setMessageTone(null);
 
     if (!name.trim()) {
       setMessage("Introdu un nume de listă.");
+      setMessageTone("error");
       return;
     }
 
     try {
       setLoading(true);
       const created = await createWatchlist(name.trim());
-      setMessage(`Listă creată: ${created.name}`);
+      setMessage(`Lista "${created.name}" a fost creată.`);
+      setMessageTone("success");
       setName("");
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Eroare la creare listă");
+      setMessage(
+        error instanceof Error ? error.message : "Lista nu a putut fi creată.",
+      );
+      setMessageTone("error");
     } finally {
       setLoading(false);
     }
@@ -54,11 +61,19 @@ export function CreateWatchlistForm() {
           disabled={loading}
           className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-60"
         >
-          {loading ? "Se creează..." : "Creează"}
+          {loading ? "Se creează lista..." : "Creează"}
         </button>
       </div>
 
-      {message ? <p className="mt-3 text-sm text-slate-300">{message}</p> : null}
+      {message ? (
+        <p
+          className={`mt-3 text-sm ${
+            messageTone === "success" ? "text-emerald-200" : "text-rose-300"
+          }`}
+        >
+          {message}
+        </p>
+      ) : null}
     </form>
   );
 }

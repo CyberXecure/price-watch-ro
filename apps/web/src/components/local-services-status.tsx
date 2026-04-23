@@ -1,4 +1,4 @@
-import { getApiHealth, getRenderedHealth } from "@/lib/api";
+import { API_BASE_URL, getApiHealth, getRenderedHealth } from "@/lib/api";
 
 function statusTone(status: "ok" | "error") {
   return status === "ok"
@@ -17,7 +17,7 @@ export default async function LocalServicesStatus() {
 
   const rendered = await getRenderedHealth().catch((error: unknown) => ({
     status: "error" as const,
-    target: "http://127.0.0.1:9222/json/version",
+    target: "rendered-refresh-engine",
     http_status: null,
     browser: null,
     websocket_debugger_url: null,
@@ -52,7 +52,7 @@ export default async function LocalServicesStatus() {
             </div>
 
             <div className="mt-3 text-sm opacity-80">
-              http://127.0.0.1:8000/health
+              {`${API_BASE_URL}/health`}
             </div>
 
             <div className="mt-3 text-sm opacity-80">
@@ -75,7 +75,7 @@ export default async function LocalServicesStatus() {
             {rendered.status === "ok" ? (
               <div className="mt-3 space-y-1 text-sm opacity-80">
                 <div>{rendered.browser || "Browser detectat"}</div>
-                <div>CDP activ și pregătit pentru refresh promo.</div>
+                <div>Engine-ul de refresh este pregătit.</div>
               </div>
             ) : (
               <div className="mt-3 text-sm opacity-80">

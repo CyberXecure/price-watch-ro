@@ -1,3 +1,6 @@
+import urllib.request
+import json
+from datetime import datetime, timezone
 import asyncio
 import json
 import sys
@@ -26,6 +29,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost",
+        "http://127.0.0.1",
+        "tauri://localhost",
+        "http://tauri.localhost",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -86,3 +93,38 @@ app.include_router(alerts_router)
 app.include_router(demo_router)
 app.include_router(dashboard_router)
 app.include_router(imports_router)
+
+def _promo_engine_health() -> dict:
+    target = "http://127.0.0.1:9222/json/version"
+    checked_at = datetime.now(timezone.utc).isoformat()
+
+    try:
+        with urllib.request.urlopen(target, timeout=2) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+            data = json.loads(raw)
+
+        return {
+            "status": "ok",
+            "mode": "external",
+            "detail": "Chrome CDP disponibil",
+            "target": target,
+            "websocket_debugger_url": data.get("webSocketDebuggerUrl"),
+            "browser": data.get("Browser"),
+            "last_checked_at": checked_at,
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "mode": "external",
+            "detail": f"Promo engine indisponibil: {type(exc).__name__}: {exc}",
+            "target": target,
+            "websocket_debugger_url": None,
+            "browser": None,
+            "last_checked_at": checked_at,
+        }
+
+
+@app.get("/health/promo-engine")
+def health_promo_engine():
+    return _promo_engine_health()
+

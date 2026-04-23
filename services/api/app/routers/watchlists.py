@@ -14,6 +14,50 @@ from app.routers.imports import FreshfulImportRequest, upsert_product_snapshot_a
 
 router = APIRouter(prefix="/watchlists", tags=["watchlists"])
 
+
+def _slugify(value: str) -> str:
+    text = (value or "").strip().lower()
+
+    replacements = {
+        "ă": "a",
+        "â": "a",
+        "î": "i",
+        "ș": "s",
+        "ş": "s",
+        "ț": "t",
+        "ţ": "t",
+    }
+
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+
+    text = re.sub(r"[^a-z0-9]+", "-", text)
+    text = re.sub(r"-{2,}", "-", text).strip("-")
+
+    return text or "lista"
+
+
+def _build_unique_watchlist_slug(
+    session: Session,
+    base_name: str,
+    current_watchlist_id: int | None = None,
+) -> str:
+    base_slug = _slugify(base_name)
+    slug = base_slug
+    counter = 2
+
+    while True:
+        existing = session.exec(
+            select(Watchlist).where(Watchlist.slug == slug)
+        ).first()
+
+        if not existing or existing.id == current_watchlist_id:
+            return slug
+
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+
+
 def _ui_unit_from_db_enum(unit: str | None) -> str | None:
     if unit is None:
         return None
@@ -130,6 +174,104 @@ def _is_discount_consistent(
     computed = ((old_price - price_total) / old_price) * 100.0
     return abs(computed - discount_percent) <= tolerance_percent_points
 
+
+def _detect_promo_kind(
+    *,
+    package_text: str | None,
+    bundle_count: int | float | None = None,
+    promo_label: str | None,
+    discount_percent: float | None,
+    old_price: float | None,
+    price_total: float | None,
+) -> str | None:
+    has_promo = (
+        (promo_label is not None and str(promo_label).strip() != "")
+        or (discount_percent is not None and discount_percent > 0)
+        or (
+            old_price is not None
+            and price_total is not None
+            and old_price > price_total
+        )
+    )
+
+    if not has_promo:
+        return None
+
+    if bundle_count is not None:
+        try:
+            parsed_bundle_count = float(bundle_count)
+        except (TypeError, ValueError):
+            parsed_bundle_count = None
+
+        if parsed_bundle_count is not None and parsed_bundle_count > 1:
+            return "bundle"
+
+    count = _extract_count_from_package_text(package_text)
+    if count is not None and count > 1:
+        return "bundle"
+
+    return "standard"
+
+def _sanitize_promo_fields(
+    *,
+    package_text: str | None,
+    availability: str | None = None,
+    bundle_count: int | float | None = None,
+    promo_label: str | None,
+    discount_percent: float | None,
+    old_price: float | None,
+    price_total: float | None,
+) -> dict[str, Any]:
+    safe_promo_label = promo_label if promo_label and str(promo_label).strip() else None
+    safe_discount_percent = discount_percent
+    safe_old_price = old_price
+
+    normalized_availability = str(availability).strip().lower() if availability is not None else ""
+    if normalized_availability == "out_of_stock":
+        return {
+            "promo_label": None,
+            "discount_percent": None,
+            "old_price": None,
+            "promo_kind": None,
+        }
+
+    if (
+        safe_old_price is not None
+        and price_total is not None
+        and safe_old_price <= price_total
+    ):
+        safe_old_price = None
+
+    if safe_discount_percent is not None:
+        if (
+            safe_old_price is None
+            or price_total is None
+            or not _is_discount_consistent(
+                price_total=price_total,
+                old_price=safe_old_price,
+                discount_percent=safe_discount_percent,
+            )
+        ):
+            safe_discount_percent = None
+
+    promo_kind = _detect_promo_kind(
+        package_text=package_text,
+        bundle_count=bundle_count,
+        promo_label=safe_promo_label,
+        discount_percent=safe_discount_percent,
+        old_price=safe_old_price,
+        price_total=price_total,
+    )
+
+    if promo_kind is None and safe_old_price is None and safe_discount_percent is None:
+        safe_promo_label = None
+
+    return {
+        "promo_label": safe_promo_label,
+        "discount_percent": safe_discount_percent,
+        "old_price": safe_old_price,
+        "promo_kind": promo_kind,
+    }
 
 def _build_payload_from_parsed(
     parsed: dict[str, Any],
@@ -258,10 +400,14 @@ def _merge_refresh_parsed(
             rendered_parsed.get("deposit_value"),
             static_parsed.get("deposit_value"),
         ),
-        "availability": _first_non_empty(
-            rendered_parsed.get("availability"),
-            static_parsed.get("availability"),
-            "unknown",
+        "availability": (
+            static_parsed.get("availability")
+            if rendered_parsed.get("availability") in (None, "", "unknown")
+            else _first_non_empty(
+                rendered_parsed.get("availability"),
+                static_parsed.get("availability"),
+                "unknown",
+            )
         ),
     }
 
@@ -417,6 +563,26 @@ def _apply_rendered_promo_safely(
     return safe, checks
 
 
+def _normalize_comparison_unit_for_status(unit: str | None) -> str:
+    ui_unit = _ui_unit_from_db_enum(unit)
+
+    if ui_unit is None:
+        return ""
+
+    normalized = str(ui_unit).strip().lower()
+
+    if normalized in {"lei/buc", "buc", "/buc"}:
+        return "lei/buc"
+    if normalized in {"lei/kg", "kg", "/kg"}:
+        return "lei/kg"
+    if normalized in {"lei/l", "l", "/l"}:
+        return "lei/l"
+    if normalized == "total":
+        return "total"
+
+    return normalized
+
+
 def _classify_price_status(
     *,
     target_price: float | None,
@@ -431,17 +597,23 @@ def _classify_price_status(
     ):
         return "fair_price"
 
-    normalized_target_unit = (target_unit or "").strip().lower()
-    normalized_current_unit = (current_comparison_unit or "").strip().lower()
+    normalized_target_unit = _normalize_comparison_unit_for_status(target_unit)
+    normalized_current_unit = _normalize_comparison_unit_for_status(current_comparison_unit)
 
     if normalized_target_unit and normalized_current_unit:
         if normalized_target_unit != normalized_current_unit:
             return "fair_price"
 
-    if current_comparison_price <= target_price:
+    lower_bound = target_price * 0.95
+    upper_bound = target_price * 1.05
+
+    if current_comparison_price <= lower_bound:
         return "best_buy"
 
-    return "high_price"
+    if current_comparison_price >= upper_bound:
+        return "high_price"
+
+    return "fair_price"
 
 
 def _compute_status_label(status: str) -> str:
@@ -464,6 +636,54 @@ def _latest_snapshot_for_product(
     ).first()
 
 
+def _preserve_recent_promo_fields(
+    *,
+    parsed: dict[str, Any],
+    previous_snapshot: PriceSnapshot | None,
+    max_age_hours: float = 12.0,
+) -> dict[str, Any]:
+    if previous_snapshot is None:
+        return parsed
+
+    has_new_promo = any(
+        [
+            parsed.get("promo_label"),
+            parsed.get("discount_percent") is not None and parsed.get("discount_percent") > 0,
+            parsed.get("old_price") is not None
+            and parsed.get("price_total") is not None
+            and parsed.get("old_price") > parsed.get("price_total"),
+        ]
+    )
+
+    if has_new_promo:
+        return parsed
+
+    previous_has_promo = any(
+        [
+            previous_snapshot.promo_label,
+            previous_snapshot.discount_percent is not None and previous_snapshot.discount_percent > 0,
+            previous_snapshot.old_price is not None
+            and previous_snapshot.price_total is not None
+            and previous_snapshot.old_price > previous_snapshot.price_total,
+        ]
+    )
+
+    if not previous_has_promo:
+        return parsed
+
+    now = datetime.utcnow()
+    age_hours = (now - previous_snapshot.captured_at).total_seconds() / 3600.0
+
+    if age_hours > max_age_hours:
+        return parsed
+
+    safe = dict(parsed)
+    safe["promo_label"] = previous_snapshot.promo_label
+    safe["discount_percent"] = previous_snapshot.discount_percent
+    safe["old_price"] = previous_snapshot.old_price
+
+    return safe
+
 def _build_refresh_response(
     *,
     session: Session,
@@ -482,8 +702,22 @@ def _build_refresh_response(
     current_status_label = None
     latest_comparison_price = None
     latest_comparison_unit = None
+    sanitized_promo = {
+        "promo_label": None,
+        "discount_percent": None,
+        "old_price": None,
+        "promo_kind": None,
+    }
 
     if latest_snapshot:
+        sanitized_promo = _sanitize_promo_fields(
+            package_text=product.package_text,
+            promo_label=latest_snapshot.promo_label,
+            discount_percent=latest_snapshot.discount_percent,
+            old_price=latest_snapshot.old_price,
+            price_total=latest_snapshot.price_total,
+        )
+
         current_status = _classify_price_status(
             target_price=item.target_price,
             target_unit=item.target_unit,
@@ -513,10 +747,12 @@ def _build_refresh_response(
         "saved_snapshot_id": saved_snapshot_id,
         "latest_snapshot_id": latest_snapshot.id if latest_snapshot else None,
         "latest_price_total": latest_snapshot.price_total if latest_snapshot else None,
-        "latest_old_price": latest_snapshot.old_price if latest_snapshot else None,
-        "latest_promo_label": latest_snapshot.promo_label if latest_snapshot else None,
-        "latest_discount_percent": latest_snapshot.discount_percent if latest_snapshot else None,
+        "latest_old_price": sanitized_promo["old_price"],
+        "latest_promo_label": sanitized_promo["promo_label"],
+        "latest_discount_percent": sanitized_promo["discount_percent"],
+        "latest_promo_kind": sanitized_promo["promo_kind"],
         "latest_deposit_value": latest_snapshot.deposit_value if latest_snapshot else None,
+                "latest_availability": latest_snapshot.availability if latest_snapshot else None,
         "latest_comparison_price": latest_comparison_price,
         "latest_comparison_unit": latest_comparison_unit,
         "latest_captured_at": latest_snapshot.captured_at.isoformat() if latest_snapshot else None,
@@ -528,7 +764,6 @@ def _build_refresh_response(
         response.update(extra)
 
     return response
-
 
 @router.get("")
 def list_watchlists(session: Session = Depends(get_session)):
@@ -574,8 +809,13 @@ def list_watchlists_with_summary(session: Session = Depends(get_session)):
         result.append(
             {
                 "id": watchlist.id,
+                "slug": watchlist.slug,
                 "name": watchlist.name,
+                "icon": watchlist.icon,
+                "description": watchlist.description,
+                "sort_order": watchlist.sort_order,
                 "created_at": watchlist.created_at,
+                "updated_at": watchlist.updated_at,
                 "total_items": total_items,
                 "total_chilipir": total_chilipir,
                 "total_pret_cinstit": total_pret_cinstit,
@@ -592,7 +832,22 @@ def create_watchlist(payload: dict[str, Any], session: Session = Depends(get_ses
     if not name:
         raise HTTPException(status_code=400, detail="Name is required")
 
-    watchlist = Watchlist(name=name)
+    existing_name = session.exec(
+        select(Watchlist).where(Watchlist.name == name)
+    ).first()
+    if existing_name:
+        raise HTTPException(status_code=400, detail="Există deja o listă cu acest nume")
+
+    now = datetime.utcnow()
+    watchlist = Watchlist(
+        slug=_build_unique_watchlist_slug(session, name),
+        name=name,
+        icon=payload.get("icon"),
+        description=payload.get("description"),
+        sort_order=int(payload.get("sort_order") or 0),
+        created_at=now,
+        updated_at=now,
+    )
     session.add(watchlist)
     session.commit()
     session.refresh(watchlist)
@@ -605,6 +860,73 @@ def get_watchlist(watchlist_id: int, session: Session = Depends(get_session)):
     if not watchlist:
         raise HTTPException(status_code=404, detail="Watchlist not found")
     return watchlist
+
+
+@router.patch("/{watchlist_id}")
+def update_watchlist(
+    watchlist_id: int,
+    payload: dict[str, Any],
+    session: Session = Depends(get_session),
+):
+    watchlist = session.get(Watchlist, watchlist_id)
+    if not watchlist:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+
+    if "name" in payload:
+        name = (payload.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name is required")
+
+        existing_name = session.exec(
+            select(Watchlist).where(
+                Watchlist.name == name,
+                Watchlist.id != watchlist_id,
+            )
+        ).first()
+        if existing_name:
+            raise HTTPException(status_code=400, detail="Există deja o listă cu acest nume")
+
+        watchlist.name = name
+        watchlist.slug = _build_unique_watchlist_slug(
+            session,
+            name,
+            current_watchlist_id=watchlist_id,
+        )
+
+    if "icon" in payload:
+        watchlist.icon = payload.get("icon")
+
+    if "description" in payload:
+        watchlist.description = payload.get("description")
+
+    if "sort_order" in payload:
+        watchlist.sort_order = int(payload.get("sort_order") or 0)
+
+    watchlist.updated_at = datetime.utcnow()
+
+    session.add(watchlist)
+    session.commit()
+    session.refresh(watchlist)
+    return watchlist
+
+
+@router.delete("/{watchlist_id}")
+def delete_watchlist(watchlist_id: int, session: Session = Depends(get_session)):
+    watchlist = session.get(Watchlist, watchlist_id)
+    if not watchlist:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+
+    items = session.exec(
+        select(WatchlistItem).where(WatchlistItem.watchlist_id == watchlist_id)
+    ).all()
+
+    for item in items:
+        session.delete(item)
+
+    session.delete(watchlist)
+    session.commit()
+
+    return {"ok": True, "deleted_watchlist_id": watchlist_id}
 
 
 @router.get("/{watchlist_id}/items/detailed")
@@ -634,6 +956,14 @@ def get_watchlist_items_detailed(
         latest_unit_price_value = latest_snapshot.unit_price_value if latest_snapshot else None
         latest_unit_price_unit = latest_snapshot.unit_price_unit if latest_snapshot else None
 
+        sanitized_promo = _sanitize_promo_fields(
+            package_text=product.package_text,
+            promo_label=latest_snapshot.promo_label if latest_snapshot else None,
+            discount_percent=latest_snapshot.discount_percent if latest_snapshot else None,
+            old_price=latest_snapshot.old_price if latest_snapshot else None,
+            price_total=latest_snapshot.price_total if latest_snapshot else None,
+        )
+
         current_status = _classify_price_status(
             target_price=item.target_price,
             target_unit=item.target_unit,
@@ -662,10 +992,12 @@ def get_watchlist_items_detailed(
                 "latest_comparison_unit": _ui_unit_from_db_enum(latest_unit_price_unit),
                 "latest_unit_price_value": latest_unit_price_value,
                 "latest_unit_price_unit": _ui_unit_from_db_enum(latest_unit_price_unit),
-                "latest_old_price": latest_snapshot.old_price if latest_snapshot else None,
-                "latest_promo_label": latest_snapshot.promo_label if latest_snapshot else None,
-                "latest_discount_percent": latest_snapshot.discount_percent if latest_snapshot else None,
+                "latest_old_price": sanitized_promo["old_price"],
+                "latest_promo_label": sanitized_promo["promo_label"],
+                "latest_discount_percent": sanitized_promo["discount_percent"],
+                "latest_promo_kind": sanitized_promo["promo_kind"],
                 "latest_deposit_value": latest_snapshot.deposit_value if latest_snapshot else None,
+                "latest_availability": latest_snapshot.availability if latest_snapshot else None,
                 "latest_captured_at": latest_snapshot.captured_at if latest_snapshot else None,
                 "notify_best_buy": item.notify_best_buy,
                 "notify_high_price": item.notify_high_price,
@@ -708,6 +1040,8 @@ def update_watchlist_item(
     if "is_active" in payload:
         item.is_active = bool(payload.get("is_active"))
 
+    item.updated_at = datetime.utcnow()
+
     session.add(item)
     session.commit()
     session.refresh(item)
@@ -734,8 +1068,15 @@ def refresh_watchlist_item(
         raise HTTPException(status_code=404, detail="Store product not found")
 
     try:
+        previous_snapshot = _latest_snapshot_for_product(session, item.store_product_id)
+
         html = fetch_html(product.url)
         static_parsed = parse_freshful_product_html(html, product.url)
+        static_parsed = _preserve_recent_promo_fields(
+            parsed=static_parsed,
+            previous_snapshot=previous_snapshot,
+            max_age_hours=12.0,
+        )
 
         payload = _build_payload_from_parsed(static_parsed, watchlist_id, item)
         upsert_result = upsert_product_snapshot_and_watchlist(
@@ -763,7 +1104,6 @@ def refresh_watchlist_item(
             status_code=400,
             detail=f"Static refresh failed: {type(exc).__name__}: {exc}",
         ) from exc
-
 
 @router.post("/{watchlist_id}/items/{item_id}/refresh-rendered")
 def refresh_watchlist_item_rendered(
@@ -848,6 +1188,10 @@ def refresh_watchlist_item_rendered(
             status_code=400,
             detail=f"Rendered refresh failed: {type(exc).__name__}: {exc}",
         ) from exc
+
+
+
+
 
 
 

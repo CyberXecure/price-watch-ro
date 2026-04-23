@@ -71,6 +71,25 @@ def extract_package_from_title(title: Optional[str]) -> Optional[str]:
     return clean_text(match.group(1))
 
 
+
+def detect_bundle_count(text: str) -> Optional[int]:
+    if not text:
+        return None
+
+    match = re.search(r"\b(\d{1,3})\s*(?:buc|buc\.|bucati|bucăți)\b", text, re.IGNORECASE)
+    if not match:
+        return None
+
+    try:
+        value = int(match.group(1))
+    except ValueError:
+        return None
+
+    if value <= 1:
+        return None
+
+    return value
+
 def detect_discount_percent(text: str) -> Optional[float]:
     if not text:
         return None
@@ -79,19 +98,23 @@ def detect_discount_percent(text: str) -> Optional[float]:
         r"Economisești\s*(\d+(?:[.,]\d+)?)\s*%",
         r"economisesti\s*(\d+(?:[.,]\d+)?)\s*%",
         r"-\s*(\d+(?:[.,]\d+)?)\s*%",
-        r"(\d+(?:[.,]\d+)?)\s*%",
+        r"Reducere\s*(\d+(?:[.,]\d+)?)\s*%",
     ]
 
     for pattern in patterns:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             try:
-                return float(match.group(1).replace(",", "."))
+                value = float(match.group(1).replace(",", "."))
             except ValueError:
                 continue
 
-    return None
+            if value <= 0 or value >= 100:
+                continue
 
+            return value
+
+    return None
 
 def detect_promo_label(text: str) -> Optional[str]:
     if not text:
@@ -367,6 +390,7 @@ def detect_rendered_price_block(page) -> dict:
     discount_percent = detect_discount_percent(target_text) or detect_discount_percent(body_text)
     promo_label = detect_promo_label(target_text) or detect_promo_label(body_text)
     deposit_value = detect_deposit_value(target_text) or detect_deposit_value(body_text)
+    bundle_count = detect_bundle_count(target_text) or detect_bundle_count(body_text)
 
     unit_price_value, unit_price_unit = detect_unit_price(target_text)
     if unit_price_value is None:
@@ -394,6 +418,7 @@ def detect_rendered_price_block(page) -> dict:
         "promo_label": promo_label,
         "discount_percent": discount_percent,
         "deposit_value": deposit_value,
+        "bundle_count": bundle_count,
         "unit_price_value": unit_price_value,
         "unit_price_unit": unit_price_unit,
         "base_measure_type": measure_type,
@@ -448,6 +473,7 @@ def parse_freshful_product_rendered(url: str) -> dict:
     discount_percent = rendered.get("discount_percent")
     promo_label = rendered.get("promo_label")
     deposit_value = rendered.get("deposit_value")
+    bundle_count = rendered.get("bundle_count")
     unit_price_value = rendered.get("unit_price_value")
     unit_price_unit = rendered.get("unit_price_unit")
 
@@ -478,6 +504,7 @@ def parse_freshful_product_rendered(url: str) -> dict:
         "promo_label": promo_label,
         "discount_percent": discount_percent,
         "deposit_value": deposit_value,
+        "bundle_count": bundle_count,
         "unit_price_value": unit_price_value,
         "unit_price_unit": unit_price_unit,
         "base_measure_type": measure_type,
@@ -497,3 +524,4 @@ def parse_freshful_product_rendered(url: str) -> dict:
         raise ValueError("Rendered parser: nu am putut extrage prețul curent al produsului.")
 
     return data
+

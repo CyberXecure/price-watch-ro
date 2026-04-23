@@ -583,8 +583,8 @@ export default async function WatchlistDetailPage({
                       <EditableTargetPrice
                         watchlistId={watchlistId}
                         itemId={item.watchlist_item_id}
-                        currentTargetPrice={item.target_price}
-                        currentTargetUnit={item.target_unit}
+                        targetPrice={item.target_price}
+                        targetUnit={item.target_unit}
                       />
 
                       <WatchlistItemActions

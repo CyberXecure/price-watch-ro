@@ -54,3 +54,11 @@ services/api/freshful_profile/
 
 # Local database backups
 *.backup.*
+*.bak
+*.bak*
+*.checkpoint*
+
+desktop/src-tauri/target/
+*.pdb
+*.msi
+*.exe

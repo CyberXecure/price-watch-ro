@@ -42,12 +42,10 @@ export function WatchlistItemEditor({
     try {
       setLoading(true);
 
-      await updateWatchlistItem({
-        watchlistId,
-        itemId,
-        targetPrice: parsedTarget,
-        notifyBestBuy,
-        notifyHighPrice,
+      await updateWatchlistItem(watchlistId, itemId, {
+        target_price: parsedTarget,
+        notify_best_buy: notifyBestBuy,
+        notify_high_price: notifyHighPrice,
       });
 
       setMessage("Salvat.");
