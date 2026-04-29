@@ -555,26 +555,62 @@ export default function WatchlistDetailClient() {
                         {formatPrice(item.latest_price_total)}
                       </div>
 
-                      {item.latest_old_price ? (
-                        <div className="mt-1 text-sm text-white/40 line-through">
-                          {formatPrice(item.latest_old_price)}
-                        </div>
-                      ) : null}
-
-                      {(item.latest_promo_label || item.latest_discount_percent) && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {item.latest_promo_label ? (
-                            <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/15 px-2.5 py-1 text-xs font-medium text-fuchsia-100">
-                              {item.latest_promo_label}
+                      {item.latest_promo_kind === "bundle" ? (
+                        <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-amber-300/25 bg-amber-300/15 px-2.5 py-1 text-xs font-semibold text-amber-100">
+                              Pachet avantajos
                             </span>
+
+                            {item.latest_promo_label ? (
+                              <span className="text-xs font-medium text-amber-100/80">
+                                {item.latest_promo_label}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {item.latest_comparison_price !== null &&
+                          item.latest_comparison_price !== undefined &&
+                          item.latest_comparison_unit ? (
+                            <div className="mt-2 text-xs text-amber-50/75">
+                              Preț calculat:{" "}
+                              <span className="font-semibold text-amber-50">
+                                {formatComparison(
+                                  item.latest_comparison_price,
+                                  item.latest_comparison_unit,
+                                )}
+                              </span>
+                            </div>
                           ) : null}
 
-                          {item.latest_discount_percent ? (
-                            <span className="rounded-full border border-emerald-400/20 bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-100">
-                              -{item.latest_discount_percent.toFixed(0)}%
-                            </span>
-                          ) : null}
+                          <div className="mt-1 text-[11px] text-amber-50/55">
+                            Reducerea clasică este ascunsă pentru pachete ca să evităm comparații greșite.
+                          </div>
                         </div>
+                      ) : (
+                        <>
+                          {item.latest_old_price ? (
+                            <div className="mt-1 text-sm text-white/40 line-through">
+                              {formatPrice(item.latest_old_price)}
+                            </div>
+                          ) : null}
+
+                          {(item.latest_promo_label || item.latest_discount_percent) && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {item.latest_promo_label ? (
+                                <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/15 px-2.5 py-1 text-xs font-medium text-fuchsia-100">
+                                  {item.latest_promo_label}
+                                </span>
+                              ) : null}
+
+                              {item.latest_discount_percent ? (
+                                <span className="rounded-full border border-emerald-400/20 bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-100">
+                                  -{item.latest_discount_percent.toFixed(0)}%
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {item.latest_deposit_value ? (
@@ -670,12 +706,4 @@ export default function WatchlistDetailClient() {
     </main>
   );
 }
-
-
-
-
-
-
-
-
 
