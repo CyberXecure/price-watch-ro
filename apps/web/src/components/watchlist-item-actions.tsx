@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import WatchlistItemActiveToggle from "@/components/watchlist-item-active-toggle";
-import { API_BASE_URL, archiveWatchlistItem, getPromoEngineHealth } from "@/lib/api";
+import { API_BASE_URL, archiveWatchlistItem, getPromoEngineHealth, startPromoEngine } from "@/lib/api";
 
 type Props = {
   watchlistId: number;
@@ -86,6 +86,25 @@ export default function WatchlistItemActions({
         setIsRefreshing(true);
       } else {
         setIsRefreshingRendered(true);
+      }
+
+      if (mode === "rendered") {
+        let health = await getPromoEngineHealth();
+
+        if (health.status !== "ok") {
+          await startPromoEngine();
+          health = await getPromoEngineHealth();
+        }
+
+        setPromoEngineAvailable(health.status === "ok");
+        setPromoEngineDetail(health.detail ?? null);
+
+        if (health.status !== "ok") {
+          throw new Error(
+            health.detail ||
+              "Motorul pentru actualizarea promo nu este disponibil acum.",
+          );
+        }
       }
 
       const endpoint =
@@ -171,14 +190,10 @@ export default function WatchlistItemActions({
         <button
           type="button"
           onClick={() => runRefresh("rendered")}
-          disabled={isBusy || !promoEngineAvailable}
+          disabled={isBusy}
           className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1.5 text-xs font-medium text-fuchsia-200 transition hover:bg-fuchsia-500/20 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isRefreshingRendered
-            ? "Actualizez promo..."
-            : promoEngineAvailable
-              ? "Actualizează promo"
-              : "Motor promo indisponibil"}
+          {isRefreshingRendered ? "Actualizez promo..." : "Actualizează promo"}
         </button>
 
         <a

@@ -1,13 +1,19 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE?.trim() || "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_BASE?.trim() || "http://127.0.0.1:18400";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method || "GET").toUpperCase();
+  const extraHeaders =
+    method === "GET"
+      ? { ...(init?.headers || {}) }
+      : {
+          "Content-Type": "application/json",
+          ...(init?.headers || {}),
+        };
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
+    headers: extraHeaders,
     cache: "no-store",
   });
 
@@ -142,6 +148,12 @@ export async function getPromoEngineHealth(): Promise<PromoEngineHealth> {
   return apiFetch<PromoEngineHealth>("/health/promo-engine");
 }
 
+export async function startPromoEngine() {
+  return apiFetch("/health/promo-engine/start", {
+    method: "POST",
+  });
+}
+
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   return apiFetch<DashboardSummary>("/dashboard/summary");
 }
@@ -242,3 +254,22 @@ export async function updateWatchlist(
 
 
 
+
+
+
+export async function refreshActiveRenderedWatchlist(watchlistId: number) {
+  return apiFetch<{
+    ok: boolean;
+    watchlist_id: number;
+    processed: number;
+    results: Array<{
+      watchlist_item_id: number;
+      ok: boolean;
+      detail?: string;
+      snapshot_id?: number;
+      parser_used?: string;
+    }>;
+  }>(`/watchlists/${watchlistId}/refresh-active-rendered`, {
+    method: "POST",
+  });
+}

@@ -74,6 +74,7 @@ class PriceSnapshot(SQLModel, table=True):
     old_price: Optional[float] = Field(default=None)
     promo_label: Optional[str] = Field(default=None, max_length=255)
     discount_percent: Optional[float] = Field(default=None)
+    promo_kind: Optional[str] = Field(default=None, max_length=50)
     deposit_value: Optional[float] = Field(default=None)
 
     availability: Optional[str] = Field(default=None, max_length=50)

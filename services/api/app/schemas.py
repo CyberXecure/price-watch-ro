@@ -42,6 +42,8 @@ class SnapshotCreate(SQLModel):
 
     old_price: Optional[float] = None
     promo_label: Optional[str] = None
+    discount_percent: Optional[float] = None
+    promo_kind: Optional[str] = None
     availability: Optional[str] = None
     captured_at: Optional[datetime] = None
 
@@ -144,6 +146,7 @@ class FreshfulImportRequest(SQLModel):
     old_price: float | None = None
     promo_label: str | None = None
     discount_percent: float | None = None
+    promo_kind: str | None = None
     deposit_value: float | None = None
     availability: str | None = None
 

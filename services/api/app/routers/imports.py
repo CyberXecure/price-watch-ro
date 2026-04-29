@@ -216,6 +216,7 @@ def _build_payload_from_parsed(
         old_price=parsed.get("old_price"),
         promo_label=parsed.get("promo_label"),
         discount_percent=parsed.get("discount_percent"),
+        promo_kind=parsed.get("promo_kind"),
         deposit_value=parsed.get("deposit_value"),
         availability=parsed.get("availability", "unknown"),
         watchlist_id=watchlist_id,
@@ -308,6 +309,7 @@ def upsert_product_snapshot_and_watchlist(
         old_price=payload.old_price,
         promo_label=payload.promo_label,
         discount_percent=payload.discount_percent,
+        promo_kind=payload.promo_kind,
         deposit_value=payload.deposit_value,
         availability=payload.availability,
     )
@@ -412,6 +414,7 @@ def upsert_product_snapshot_and_watchlist(
         "snapshot_old_price": snapshot.old_price,
         "snapshot_promo_label": snapshot.promo_label,
         "snapshot_discount_percent": snapshot.discount_percent,
+        "snapshot_promo_kind": snapshot.promo_kind,
         "comparison_price": comparison_price,
         "comparison_unit": _ui_unit_from_db_enum(normalized_comparison_unit_db),
         "watchlist_item_id": watchlist_item_id_value,

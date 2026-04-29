@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import EditableTargetPrice from "@/components/editable-target-price";
 import WatchlistItemActions from "@/components/watchlist-item-actions";
@@ -11,6 +11,7 @@ import {
   getWatchlist,
   getWatchlistDetailedItems,
   getWatchlistsWithSummary,
+  refreshActiveRenderedWatchlist,
   waitForApiReady,
   type Watchlist,
   type WatchlistDetailedItem,
@@ -54,6 +55,24 @@ function kpiCard(
   );
 }
 
+
+function formatAutoRefreshAgo(value: number | null): string {
+  if (!value) return "niciodată";
+
+  const diffMs = Date.now() - value;
+
+  if (diffMs < 60 * 1000) return "acum mai puțin de 1 min";
+
+  const diffMin = Math.floor(diffMs / (60 * 1000));
+  if (diffMin < 60) return `acum ${diffMin} min`;
+
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `acum ${diffHours} h`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `acum ${diffDays} zile`;
+}
+
 export default function WatchlistDetailClient() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
@@ -61,10 +80,16 @@ export default function WatchlistDetailClient() {
   const viewParam = searchParams.get("view");
 
   const [loading, setLoading] = useState(true);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const [lastAutoRefreshAt, setLastAutoRefreshAt] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<"success" | "error">("success");
   const [error, setError] = useState<string | null>(null);
   const [watchlist, setWatchlist] = useState<Watchlist | null>(null);
   const [rawItems, setRawItems] = useState<WatchlistDetailedItem[]>([]);
   const [allWatchlists, setAllWatchlists] = useState<WatchlistSummary[]>([]);
+  const initialAutoRefreshRan = useRef(false);
 
   const watchlistId = Number(id);
   const promoOnly = promoParam === "1";
@@ -95,9 +120,50 @@ export default function WatchlistDetailClient() {
   }
 
   useEffect(() => {
+    if (initialAutoRefreshRan.current) {
+      return;
+    }
+    initialAutoRefreshRan.current = true;
+
     async function load() {
       try {
         setLoading(true);
+
+        const refreshKey = `watchlist-auto-refresh-${watchlistId}`;
+        const lastRefreshRaw =
+          typeof window !== "undefined"
+            ? window.sessionStorage.getItem(refreshKey)
+            : null;
+
+        const lastRefreshTs = lastRefreshRaw ? Number(lastRefreshRaw) : 0;
+        if (lastRefreshTs && !Number.isNaN(lastRefreshTs)) {
+          setLastAutoRefreshAt(lastRefreshTs);
+        }
+
+        const now = Date.now();
+        const shouldAutoRefresh =
+          !lastRefreshTs || Number.isNaN(lastRefreshTs) || now - lastRefreshTs > 5 * 60 * 1000;
+
+        if (shouldAutoRefresh) {
+          setAutoRefreshing(true);
+
+          await waitForApiReady();
+
+          try {
+            await refreshActiveRenderedWatchlist(watchlistId);
+
+            if (typeof window !== "undefined") {
+              const nowTs = Date.now();
+              window.sessionStorage.setItem(refreshKey, String(nowTs));
+              setLastAutoRefreshAt(nowTs);
+            }
+          } catch (error) {
+            console.error("Auto refresh on open failed:", error);
+          } finally {
+            setAutoRefreshing(false);
+          }
+        }
+
         await reloadData();
       } finally {
         setLoading(false);
@@ -106,6 +172,51 @@ export default function WatchlistDetailClient() {
 
     load();
   }, [id, watchlistId]);
+
+
+  async function handleRefreshNow() {
+    try {
+      setError(null);
+      setManualRefreshing(true);
+
+      if (!id || Number.isNaN(watchlistId)) {
+        throw new Error("ID listă invalid.");
+      }
+
+      await waitForApiReady();
+      await refreshActiveRenderedWatchlist(watchlistId);
+
+      if (typeof window !== "undefined") {
+        const nowTs = Date.now();
+        window.sessionStorage.setItem(`watchlist-auto-refresh-${watchlistId}`, String(nowTs));
+        setLastAutoRefreshAt(nowTs);
+      }
+
+      await reloadData();
+      setToastTone("success");
+      setToastMessage("Actualizare finalizată");
+    } catch (error) {
+      console.error("Manual refresh failed:", error);
+      setError("Actualizarea manuală a eșuat.");
+      setToastTone("error");
+      setToastMessage("Actualizarea a eșuat");
+    } finally {
+      setManualRefreshing(false);
+    }
+  }
+
+
+  useEffect(() => {
+    if (!toastMessage) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+
+    return () => window.clearTimeout(timeout);
+  }, [toastMessage]);
 
   const sortedItems = useMemo(() => {
     return [...rawItems].sort((a, b) => {
@@ -221,6 +332,35 @@ export default function WatchlistDetailClient() {
               ))}
             </div>
           </div>
+        </div>
+
+        {toastMessage ? (
+          <div
+            className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${
+              toastTone === "success"
+                ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100"
+                : "border-rose-400/20 bg-rose-500/10 text-rose-100"
+            }`}
+          >
+            {toastMessage}
+          </div>
+        ) : null}
+
+        <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-white/70">
+            {autoRefreshing
+              ? "Se actualizează automat prețurile..."
+              : `Ultima actualizare automată: ${formatAutoRefreshAgo(lastAutoRefreshAt)}`}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRefreshNow}
+            disabled={manualRefreshing || autoRefreshing}
+            className="inline-flex items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {manualRefreshing ? "Se actualizează..." : "Actualizează acum"}
+          </button>
         </div>
 
         <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-sm backdrop-blur-sm">
@@ -517,7 +657,7 @@ export default function WatchlistDetailClient() {
                       />
 
                       <div className="mt-4 text-xs text-white/45">
-                        Actualizat: {formatCapturedAt(item.latest_captured_at)}
+                        Ultimul snapshot: {formatCapturedAt(item.latest_captured_at)}
                       </div>
                     </div>
                   </article>
@@ -530,6 +670,7 @@ export default function WatchlistDetailClient() {
     </main>
   );
 }
+
 
 
 

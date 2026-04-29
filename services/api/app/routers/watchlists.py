@@ -1,5 +1,7 @@
 import re
 from datetime import datetime
+import requests
+import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -284,7 +286,6 @@ def _build_payload_from_parsed(
         brand=parsed.get("brand"),
         image_url=parsed.get("image_url"),
         category=parsed.get("category"),
-        package_text=parsed.get("package_text"),
         base_measure_type=parsed.get("base_measure_type") or "unknown",
         base_measure_value=parsed.get("base_measure_value"),
         base_measure_unit=parsed.get("base_measure_unit"),
@@ -296,6 +297,7 @@ def _build_payload_from_parsed(
         old_price=parsed.get("old_price"),
         promo_label=_normalize_promo_label(parsed.get("promo_label")),
         discount_percent=parsed.get("discount_percent"),
+        promo_kind=parsed.get("promo_kind"),
         deposit_value=parsed.get("deposit_value"),
         availability=parsed.get("availability") or "unknown",
         watchlist_id=watchlist_id,
@@ -399,6 +401,10 @@ def _merge_refresh_parsed(
         "deposit_value": _first_non_empty(
             rendered_parsed.get("deposit_value"),
             static_parsed.get("deposit_value"),
+        ),
+        "bundle_count": _first_non_empty(
+            rendered_parsed.get("bundle_count"),
+            static_parsed.get("bundle_count"),
         ),
         "availability": (
             static_parsed.get("availability")
@@ -572,10 +578,7 @@ def _apply_rendered_promo_safely(
             static_parsed.get("price_total"),
             merged_parsed.get("price_total"),
         )
-        safe["old_price"] = _first_non_empty(
-            static_parsed.get("old_price"),
-            merged_parsed.get("old_price"),
-        )
+        safe["old_price"] = None
         safe["unit_price_value"] = _first_non_empty(
             static_parsed.get("unit_price_value"),
             merged_parsed.get("unit_price_value"),
@@ -590,11 +593,7 @@ def _apply_rendered_promo_safely(
             merged_parsed.get("promo_label"),
             "OFERTĂ",
         )
-        safe["discount_percent"] = _first_non_empty(
-            static_parsed.get("discount_percent"),
-            rendered_parsed.get("discount_percent"),
-            merged_parsed.get("discount_percent"),
-        )
+        safe["discount_percent"] = None
 
     safe["price_total"] = _first_non_empty(
         static_parsed.get("price_total"),
@@ -611,11 +610,16 @@ def _apply_rendered_promo_safely(
         merged_parsed.get("unit_price_unit"),
         safe.get("unit_price_unit"),
     )
-    safe["old_price"] = _first_non_empty(
-        static_parsed.get("old_price"),
-        merged_parsed.get("old_price"),
-        safe.get("old_price"),
-    )
+
+    if safe.get("promo_kind") == "bundle":
+        safe["old_price"] = None
+        safe["discount_percent"] = None
+    else:
+        safe["old_price"] = _first_non_empty(
+            static_parsed.get("old_price"),
+            merged_parsed.get("old_price"),
+            safe.get("old_price"),
+        )
 
     return safe, checks
 
@@ -680,6 +684,38 @@ def _compute_status_label(status: str) -> str:
         "high_price": "Răsfăț",
     }
     return mapping.get(status, status)
+
+
+
+def _ensure_promo_engine_ready_for_rendered() -> None:
+    last_error = None
+
+    for _ in range(3):
+        try:
+            response = requests.post(
+                "http://127.0.0.1:18400/health/promo-engine/start",
+                timeout=10,
+            )
+            response.raise_for_status()
+        except Exception as exc:
+            last_error = exc
+
+        time.sleep(2)
+
+        for _ in range(30):
+            try:
+                probe = requests.get(
+                    "http://127.0.0.1:9222/json/version",
+                    timeout=2,
+                )
+                probe.raise_for_status()
+                return
+            except Exception as exc:
+                last_error = exc
+                time.sleep(0.5)
+
+    if last_error:
+        raise last_error
 
 
 def _latest_snapshot_for_product(
@@ -767,13 +803,25 @@ def _build_refresh_response(
     }
 
     if latest_snapshot:
-        sanitized_promo = _sanitize_promo_fields(
-            package_text=product.package_text,
-            promo_label=latest_snapshot.promo_label,
-            discount_percent=latest_snapshot.discount_percent,
-            old_price=latest_snapshot.old_price,
-            price_total=latest_snapshot.price_total,
-        )
+        if getattr(latest_snapshot, "promo_kind", None):
+            sanitized_promo = {
+                "promo_label": latest_snapshot.promo_label,
+                "discount_percent": latest_snapshot.discount_percent,
+                "old_price": latest_snapshot.old_price,
+                "promo_kind": latest_snapshot.promo_kind,
+            }
+        else:
+            sanitized_promo = _sanitize_promo_fields(
+                package_text=product.package_text,
+                bundle_count=_first_non_empty(
+                    rendered_parsed.get("bundle_count") if rendered_parsed else None,
+                    static_parsed.get("bundle_count") if static_parsed else None,
+                ),
+                promo_label=latest_snapshot.promo_label,
+                discount_percent=latest_snapshot.discount_percent,
+                old_price=latest_snapshot.old_price,
+                price_total=latest_snapshot.price_total,
+            )
 
         current_status = _classify_price_status(
             target_price=item.target_price,
@@ -1013,13 +1061,30 @@ def get_watchlist_items_detailed(
         latest_unit_price_value = latest_snapshot.unit_price_value if latest_snapshot else None
         latest_unit_price_unit = latest_snapshot.unit_price_unit if latest_snapshot else None
 
-        sanitized_promo = _sanitize_promo_fields(
-            package_text=product.package_text,
-            promo_label=latest_snapshot.promo_label if latest_snapshot else None,
-            discount_percent=latest_snapshot.discount_percent if latest_snapshot else None,
-            old_price=latest_snapshot.old_price if latest_snapshot else None,
-            price_total=latest_snapshot.price_total if latest_snapshot else None,
-        )
+        latest_bundle_count = None
+        if latest_snapshot and product.url and "freshful.ro" in product.url:
+            try:
+                rendered_latest = parse_product_page_rendered(product.url)
+                latest_bundle_count = rendered_latest.get("bundle_count")
+            except Exception:
+                latest_bundle_count = None
+
+        if latest_snapshot and getattr(latest_snapshot, "promo_kind", None):
+            sanitized_promo = {
+                "promo_label": latest_snapshot.promo_label,
+                "discount_percent": latest_snapshot.discount_percent,
+                "old_price": latest_snapshot.old_price,
+                "promo_kind": latest_snapshot.promo_kind,
+            }
+        else:
+            sanitized_promo = _sanitize_promo_fields(
+                package_text=product.package_text,
+                bundle_count=latest_bundle_count,
+                promo_label=latest_snapshot.promo_label if latest_snapshot else None,
+                discount_percent=latest_snapshot.discount_percent if latest_snapshot else None,
+                old_price=latest_snapshot.old_price if latest_snapshot else None,
+                price_total=latest_snapshot.price_total if latest_snapshot else None,
+            )
 
         current_status = _classify_price_status(
             target_price=item.target_price,
@@ -1162,6 +1227,116 @@ def refresh_watchlist_item(
             detail=f"Static refresh failed: {type(exc).__name__}: {exc}",
         ) from exc
 
+
+
+@router.post("/{watchlist_id}/refresh-active-rendered")
+def refresh_active_watchlist_items_rendered(
+    watchlist_id: int,
+    session: Session = Depends(get_session),
+):
+    try:
+        _ensure_promo_engine_ready_for_rendered()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Promo engine start failed: {type(exc).__name__}: {exc}",
+        ) from exc
+    watchlist = session.get(Watchlist, watchlist_id)
+    if not watchlist:
+        raise HTTPException(status_code=404, detail="Watchlist not found")
+
+    items = session.exec(
+        select(WatchlistItem).where(
+            WatchlistItem.watchlist_id == watchlist_id,
+            WatchlistItem.is_active == True,  # noqa: E712
+        )
+    ).all()
+
+    results: list[dict[str, Any]] = []
+
+    for item in items:
+        product = session.get(StoreProduct, item.store_product_id)
+        if not product:
+            results.append(
+                {
+                    "watchlist_item_id": item.id,
+                    "ok": False,
+                    "detail": "Store product not found",
+                }
+            )
+            continue
+
+        static_parsed = None
+
+        try:
+            try:
+                html = fetch_html(product.url)
+                static_parsed = parse_freshful_product_html(html, product.url)
+            except Exception:
+                static_parsed = None
+
+            rendered_parsed = parse_freshful_product_rendered(product.url)
+
+            merged_parsed = _merge_refresh_parsed(
+                static_parsed=static_parsed,
+                rendered_parsed=rendered_parsed,
+                product=product,
+            )
+
+            safe_parsed, pricing_checks = _apply_rendered_promo_safely(
+                merged_parsed=merged_parsed,
+                static_parsed=static_parsed,
+                rendered_parsed=rendered_parsed,
+                product=product,
+            )
+
+            if safe_parsed.get("price_total") is None:
+                results.append(
+                    {
+                        "watchlist_item_id": item.id,
+                        "ok": False,
+                        "detail": "missing price_total after validation",
+                    }
+                )
+                continue
+
+            payload = _build_payload_from_parsed(safe_parsed, watchlist_id, item)
+            upsert_result = upsert_product_snapshot_and_watchlist(
+                payload=payload,
+                session=session,
+                forced_watchlist_item_id=item.id,
+            )
+
+            results.append(
+                {
+                    "watchlist_item_id": item.id,
+                    "ok": True,
+                    "snapshot_id": upsert_result.get("snapshot_id"),
+                    "parser_used": "rendered",
+                    "rendered_pricing_checks": pricing_checks,
+                    "safe_price_total": safe_parsed.get("price_total"),
+                    "safe_old_price": safe_parsed.get("old_price"),
+                    "safe_discount_percent": safe_parsed.get("discount_percent"),
+                    "safe_promo_kind": safe_parsed.get("promo_kind"),
+                }
+            )
+        except Exception as exc:
+            results.append(
+                {
+                    "watchlist_item_id": item.id,
+                    "ok": False,
+                    "detail": f"{type(exc).__name__}: {exc}",
+                }
+            )
+
+    return {
+        "ok": True,
+        "watchlist_id": watchlist_id,
+        "processed": len(results),
+        "results": results,
+    }
+
+
 @router.post("/{watchlist_id}/items/{item_id}/refresh-rendered")
 def refresh_watchlist_item_rendered(
     watchlist_id: int,
@@ -1245,6 +1420,7 @@ def refresh_watchlist_item_rendered(
             status_code=400,
             detail=f"Rendered refresh failed: {type(exc).__name__}: {exc}",
         ) from exc
+
 
 
 
