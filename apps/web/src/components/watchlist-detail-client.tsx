@@ -555,7 +555,7 @@ export default function WatchlistDetailClient() {
                         {formatPrice(item.latest_price_total)}
                       </div>
 
-                      {item.latest_promo_kind === "bundle" ? (
+                      {item.latest_promo_kind === "bundle" && item.latest_availability === "in_stock" ? (
                         <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-3 py-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-full border border-amber-300/25 bg-amber-300/15 px-2.5 py-1 text-xs font-semibold text-amber-100">
@@ -706,4 +706,5 @@ export default function WatchlistDetailClient() {
     </main>
   );
 }
+
 
