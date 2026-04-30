@@ -265,6 +265,10 @@ def _sanitize_promo_fields(
         price_total=price_total,
     )
 
+    if promo_kind == "bundle":
+        safe_old_price = None
+        safe_discount_percent = None
+
     if promo_kind is None and safe_old_price is None and safe_discount_percent is None:
         safe_promo_label = None
 
