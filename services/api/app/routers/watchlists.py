@@ -212,6 +212,11 @@ def _detect_promo_kind(
     if count is not None and count > 1:
         return "bundle"
 
+    promo_text = str(promo_label or "").strip().lower()
+    bundle_markers = ("1+1", "2 buc", "3 buc", "4 buc", "pachet", "bundle", "deals")
+    if any(marker in promo_text for marker in bundle_markers):
+        return "bundle"
+
     return "standard"
 
 def _sanitize_promo_fields(
