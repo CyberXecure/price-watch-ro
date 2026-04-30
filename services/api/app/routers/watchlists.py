@@ -1076,6 +1076,11 @@ def get_watchlist_items_detailed(
                 "old_price": latest_snapshot.old_price,
                 "promo_kind": latest_snapshot.promo_kind,
             }
+
+            if latest_bundle_count is not None:
+                sanitized_promo["promo_kind"] = "bundle"
+                sanitized_promo["old_price"] = None
+                sanitized_promo["discount_percent"] = None
         else:
             sanitized_promo = _sanitize_promo_fields(
                 package_text=product.package_text,
