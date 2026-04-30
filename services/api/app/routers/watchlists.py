@@ -1314,6 +1314,10 @@ def refresh_active_watchlist_items_rendered(
                 )
                 continue
 
+            if safe_parsed.get("promo_kind") == "bundle":
+                safe_parsed["old_price"] = None
+                safe_parsed["discount_percent"] = None
+
             payload = _build_payload_from_parsed(safe_parsed, watchlist_id, item)
             upsert_result = upsert_product_snapshot_and_watchlist(
                 payload=payload,
@@ -1399,6 +1403,10 @@ def refresh_watchlist_item_rendered(
                 status_code=400,
                 detail="Rendered refresh failed: missing price_total after validation",
             )
+
+        if safe_parsed.get("promo_kind") == "bundle":
+            safe_parsed["old_price"] = None
+            safe_parsed["discount_percent"] = None
 
         payload = _build_payload_from_parsed(safe_parsed, watchlist_id, item)
         upsert_result = upsert_product_snapshot_and_watchlist(
