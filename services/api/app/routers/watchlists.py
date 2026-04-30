@@ -581,6 +581,18 @@ def _apply_rendered_promo_safely(
         merged_parsed.get("promo_kind"),
     )
 
+    promo_text = str(_first_non_empty(
+        rendered_parsed.get("promo_label"),
+        static_parsed.get("promo_label"),
+        merged_parsed.get("promo_label"),
+        "",
+    )).strip().lower()
+    if bundle_kind != "bundle" and any(
+        marker in promo_text
+        for marker in ("1+1", "2 buc", "3 buc", "4 buc", "pachet", "bundle", "deals")
+    ):
+        bundle_kind = "bundle"
+
     if bundle_kind == "bundle":
         safe["promo_kind"] = "bundle"
         safe["price_total"] = _first_non_empty(
