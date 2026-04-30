@@ -297,6 +297,14 @@ def upsert_product_snapshot_and_watchlist(
     normalized_target_unit_ui = _normalize_request_target_unit(payload.target_unit)
     normalized_target_unit_db = _db_enum_from_ui_unit(normalized_target_unit_ui)
 
+    safe_old_price = payload.old_price
+    safe_discount_percent = payload.discount_percent
+    safe_promo_kind = payload.promo_kind
+
+    if safe_promo_kind == "bundle":
+        safe_old_price = None
+        safe_discount_percent = None
+
     snapshot = PriceSnapshot(
         store_product_id=product.id,
         captured_at=datetime.utcnow(),
@@ -306,10 +314,10 @@ def upsert_product_snapshot_and_watchlist(
         unit_price_unit=normalized_comparison_unit_db,
         comparison_price=comparison_price,
         comparison_unit=normalized_comparison_unit_db,
-        old_price=payload.old_price,
+        old_price=safe_old_price,
         promo_label=payload.promo_label,
-        discount_percent=payload.discount_percent,
-        promo_kind=payload.promo_kind,
+        discount_percent=safe_discount_percent,
+        promo_kind=safe_promo_kind,
         deposit_value=payload.deposit_value,
         availability=payload.availability,
     )
@@ -395,7 +403,7 @@ def upsert_product_snapshot_and_watchlist(
             comparison_price=comparison_price,
             comparison_unit=normalized_comparison_unit_ui,
             price_total=payload.price_total,
-            old_price=payload.old_price,
+            old_price=safe_old_price,
             new_price=payload.price_total,
         )
         session.commit()
