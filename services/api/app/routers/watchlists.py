@@ -665,6 +665,87 @@ def _normalize_comparison_unit_for_status(unit: str | None) -> str:
     return normalized
 
 
+def _compute_deal_score(
+    *,
+    availability: str | None,
+    promo_kind: str | None,
+    discount_percent: float | None,
+    old_price: float | None,
+    price_total: float | None,
+    comparison_price: float | None,
+    comparison_unit: str | None,
+    target_price: float | None,
+    target_unit: str | None,
+) -> dict[str, object]:
+    normalized_availability = str(availability or "").strip().lower()
+    if normalized_availability and normalized_availability != "in_stock":
+        return {
+            "score": 0,
+            "label": "Indisponibil",
+            "reason": "Produsul nu este disponibil momentan.",
+        }
+
+    score = 45
+    reasons: list[str] = []
+
+    if promo_kind == "bundle":
+        score += 25
+        reasons.append("promoție de tip pachet")
+
+    if discount_percent is not None and discount_percent > 0:
+        discount_bonus = min(25, max(0, int(round(discount_percent * 0.7))))
+        score += discount_bonus
+        reasons.append(f"discount afișat ~{discount_percent:.0f}%")
+
+    if old_price is not None and price_total is not None and old_price > price_total:
+        score += 10
+        reasons.append("preț mai mic decât prețul anterior")
+
+    normalized_target_unit = _normalize_comparison_unit_for_status(target_unit)
+    normalized_current_unit = _normalize_comparison_unit_for_status(comparison_unit)
+
+    if (
+        target_price is not None
+        and comparison_price is not None
+        and comparison_price > 0
+        and normalized_target_unit
+        and normalized_current_unit
+        and normalized_target_unit == normalized_current_unit
+    ):
+        if comparison_price <= target_price * 0.90:
+            score += 30
+            reasons.append("sub ținta ta cu cel puțin 10%")
+        elif comparison_price <= target_price:
+            score += 20
+            reasons.append("sub ținta ta")
+        elif comparison_price <= target_price * 1.05:
+            score += 5
+            reasons.append("aproape de ținta ta")
+        else:
+            score -= 20
+            reasons.append("peste ținta ta")
+
+    score = max(0, min(100, score))
+
+    if score >= 85:
+        label = "🔥 Chilipir real"
+    elif score >= 70:
+        label = "👍 Bun"
+    elif score >= 50:
+        label = "😐 OK"
+    else:
+        label = "💸 Scump"
+
+    if not reasons:
+        reasons.append("scor calculat din prețul curent")
+
+    return {
+        "score": score,
+        "label": label,
+        "reason": ", ".join(reasons),
+    }
+
+
 def _classify_price_status(
     *,
     target_price: float | None,
@@ -1120,6 +1201,18 @@ def get_watchlist_items_detailed(
         )
         current_status_label = _compute_status_label(current_status)
 
+        deal_score = _compute_deal_score(
+            availability=latest_snapshot.availability if latest_snapshot else None,
+            promo_kind=sanitized_promo["promo_kind"],
+            discount_percent=sanitized_promo["discount_percent"],
+            old_price=sanitized_promo["old_price"],
+            price_total=latest_price_total,
+            comparison_price=latest_unit_price_value,
+            comparison_unit=latest_unit_price_unit,
+            target_price=item.target_price,
+            target_unit=item.target_unit,
+        )
+
         result.append(
             {
                 "watchlist_item_id": item.id,
@@ -1144,6 +1237,9 @@ def get_watchlist_items_detailed(
                 "latest_promo_label": sanitized_promo["promo_label"],
                 "latest_discount_percent": sanitized_promo["discount_percent"],
                 "latest_promo_kind": sanitized_promo["promo_kind"],
+                "deal_score": deal_score["score"],
+                "deal_score_label": deal_score["label"],
+                "deal_score_reason": deal_score["reason"],
                 "latest_deposit_value": latest_snapshot.deposit_value if latest_snapshot else None,
                 "latest_availability": latest_snapshot.availability if latest_snapshot else None,
                 "latest_captured_at": latest_snapshot.captured_at if latest_snapshot else None,

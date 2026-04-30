@@ -220,15 +220,43 @@ export default function WatchlistDetailClient() {
 
   const sortedItems = useMemo(() => {
     return [...rawItems].sort((a, b) => {
+      const aUnavailable =
+        a.latest_availability && a.latest_availability !== "in_stock" ? 1 : 0;
+      const bUnavailable =
+        b.latest_availability && b.latest_availability !== "in_stock" ? 1 : 0;
+
+      if (aUnavailable !== bUnavailable) {
+        return aUnavailable - bUnavailable;
+      }
+
+      const aScore = a.deal_score ?? 0;
+      const bScore = b.deal_score ?? 0;
+
+      if (aScore !== bScore) {
+        return bScore - aScore;
+      }
+
       const aPromo = hasPromo(a) ? 1 : 0;
       const bPromo = hasPromo(b) ? 1 : 0;
 
-      if (aPromo !== bPromo) return bPromo - aPromo;
+      if (aPromo !== bPromo) {
+        return bPromo - aPromo;
+      }
 
-      const aTs = a.latest_captured_at ? new Date(a.latest_captured_at).getTime() : 0;
-      const bTs = b.latest_captured_at ? new Date(b.latest_captured_at).getTime() : 0;
+      const statusRank: Record<string, number> = {
+        best_buy: 0,
+        fair_price: 1,
+        high_price: 2,
+      };
 
-      return bTs - aTs;
+      const aStatusRank = statusRank[a.current_status] ?? 1;
+      const bStatusRank = statusRank[b.current_status] ?? 1;
+
+      if (aStatusRank !== bStatusRank) {
+        return aStatusRank - bStatusRank;
+      }
+
+      return a.product_title.localeCompare(b.product_title, "ro");
     });
   }, [rawItems]);
 
@@ -659,6 +687,32 @@ export default function WatchlistDetailClient() {
                       >
                         {item.current_status_label}
                       </div>
+
+                      {item.deal_score_label ? (
+                        <div
+                          className={`mt-3 inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                            (item.deal_score ?? 0) >= 85
+                              ? "border-emerald-300/25 bg-emerald-400/15 text-emerald-100"
+                              : (item.deal_score ?? 0) >= 70
+                                ? "border-sky-300/25 bg-sky-400/15 text-sky-100"
+                                : (item.deal_score ?? 0) >= 50
+                                  ? "border-white/15 bg-white/10 text-white/75"
+                                  : "border-rose-300/25 bg-rose-400/15 text-rose-100"
+                          }`}
+                          title={item.deal_score_reason ?? undefined}
+                        >
+                          {item.deal_score_label}
+                          {item.deal_score !== null && item.deal_score !== undefined
+                            ? ` · ${item.deal_score}/100`
+                            : ""}
+                        </div>
+                      ) : null}
+
+                      {item.deal_score_reason ? (
+                        <div className="mt-2 text-[11px] leading-4 text-white/45">
+                          {item.deal_score_reason}
+                        </div>
+                      ) : null}
 
                       <div className="mt-3 flex flex-wrap gap-2">
                         {itemHasPromo && !isUnavailable ? (

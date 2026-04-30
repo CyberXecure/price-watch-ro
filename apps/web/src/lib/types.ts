@@ -36,6 +36,9 @@ export interface WatchlistItemDetailed {
   latest_comparison_unit?: ComparisonUnit | null;
   latest_unit_price_value?: number | null;
   latest_unit_price_unit?: string | null;
+  deal_score?: number | null;
+  deal_score_label?: string | null;
+  deal_score_reason?: string | null;
   latest_captured_at?: string | null;
   notify_best_buy: boolean;
   notify_high_price: boolean;

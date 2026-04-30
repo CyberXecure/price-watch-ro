@@ -104,6 +104,9 @@ export type WatchlistDetailedItem = {
   latest_promo_label?: string | null;
   latest_discount_percent?: number | null;
   latest_promo_kind?: string | null;
+  deal_score?: number | null;
+  deal_score_label?: string | null;
+  deal_score_reason?: string | null;
   latest_deposit_value?: number | null;
   latest_availability?: string | null;
   latest_captured_at: string | null;
