@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import EditableTargetPrice from "@/components/editable-target-price";
 import WatchlistItemActions from "@/components/watchlist-item-actions";
@@ -89,7 +89,6 @@ export default function WatchlistDetailClient() {
   const [watchlist, setWatchlist] = useState<Watchlist | null>(null);
   const [rawItems, setRawItems] = useState<WatchlistDetailedItem[]>([]);
   const [allWatchlists, setAllWatchlists] = useState<WatchlistSummary[]>([]);
-  const initialAutoRefreshRan = useRef(false);
 
   const watchlistId = Number(id);
   const promoOnly = promoParam === "1";
@@ -120,11 +119,6 @@ export default function WatchlistDetailClient() {
   }
 
   useEffect(() => {
-    if (initialAutoRefreshRan.current) {
-      return;
-    }
-    initialAutoRefreshRan.current = true;
-
     async function load() {
       try {
         setLoading(true);
