@@ -536,6 +536,26 @@ def _apply_rendered_promo_safely(
         and rendered_price_total < (static_price_total * 0.8)
     )
 
+    rendered_discount_percent = rendered_parsed.get("discount_percent")
+    rendered_old_price = rendered_parsed.get("old_price")
+
+    rendered_bundle_price_pattern = (
+        static_price_total is not None
+        and rendered_price_total is not None
+        and rendered_price_total > (static_price_total * 1.2)
+        and rendered_discount_percent is not None
+        and rendered_discount_percent > 0
+    )
+
+    rendered_bundle_unit_price_pattern = (
+        static_price_total is not None
+        and rendered_price_total is not None
+        and rendered_price_total < (static_price_total * 0.98)
+        and rendered_discount_percent is not None
+        and rendered_discount_percent > 0
+        and rendered_old_price is None
+    )
+
     if rendered_suspicious_vs_static:
         safe["price_total"] = _first_non_empty(
             static_parsed.get("price_total"),
@@ -590,6 +610,11 @@ def _apply_rendered_promo_safely(
     if bundle_kind != "bundle" and any(
         marker in promo_text
         for marker in ("1+1", "2 buc", "3 buc", "4 buc", "pachet", "bundle", "deals")
+    ):
+        bundle_kind = "bundle"
+
+    if bundle_kind != "bundle" and (
+        rendered_bundle_price_pattern or rendered_bundle_unit_price_pattern
     ):
         bundle_kind = "bundle"
 
@@ -689,7 +714,7 @@ def _compute_deal_score(
     reasons: list[str] = []
 
     if promo_kind == "bundle":
-        score += 25
+        score += 10
         reasons.append("promoție de tip pachet")
 
     if discount_percent is not None and discount_percent > 0:
