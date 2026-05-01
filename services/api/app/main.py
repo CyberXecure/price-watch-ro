@@ -116,7 +116,9 @@ def _find_chrome_path() -> str | None:
 
 def _start_promo_engine() -> dict:
     chrome_path = _find_chrome_path()
-    profile_dir = r"D:\dev\chrome-freshful-debug"
+    profile_root = os.environ.get("LOCALAPPDATA") or os.getcwd()
+    profile_dir = os.path.join(profile_root, "PriceWatchRO", "chrome-cdp-no-extensions")
+    os.makedirs(profile_dir, exist_ok=True)
 
     if not chrome_path:
         return {
@@ -140,6 +142,12 @@ def _start_promo_engine() -> dict:
                 chrome_path,
                 "--remote-debugging-port=9222",
                 f"--user-data-dir={profile_dir}",
+                "--disable-extensions",
+                "--disable-component-extensions-with-background-pages",
+                "--disable-default-apps",
+                "--disable-sync",
+                "--no-first-run",
+                "--no-default-browser-check",
                 "--lang=ro",
                 "--accept-lang=ro-RO,ro",
                 "--new-window",

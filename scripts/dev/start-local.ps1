@@ -6,7 +6,7 @@ $ProjectRoot = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir "..\..\"))
 $ApiDir = Join-Path $ProjectRoot "services\api"
 $WebDir = Join-Path $ProjectRoot "apps\web"
 
-$ChromeProfile = "D:\dev\chrome-freshful-debug"
+$ChromeProfile = Join-Path $env:LOCALAPPDATA "PriceWatchRO\chrome-cdp-dev-no-extensions"
 $ChromeCdpUrl = "http://127.0.0.1:9222/json/version"
 
 function Get-ChromePath {
@@ -169,6 +169,12 @@ function Ensure-ChromeCdp {
     Start-Process -FilePath $chromePath -ArgumentList @(
         "--remote-debugging-port=9222",
         "--user-data-dir=$ChromeProfile",
+        "--disable-extensions",
+        "--disable-component-extensions-with-background-pages",
+        "--disable-default-apps",
+        "--disable-sync",
+        "--no-first-run",
+        "--no-default-browser-check",
         "--lang=ro",
         "--accept-lang=ro-RO,ro"
     ) | Out-Null
