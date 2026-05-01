@@ -587,7 +587,9 @@ export default function WatchlistDetailClient() {
                         <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-3 py-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-full border border-amber-300/25 bg-amber-300/15 px-2.5 py-1 text-xs font-semibold text-amber-100">
-                              Pachet avantajos
+                              {(item.deal_score ?? 0) >= 70
+                                ? "Pachet avantajos"
+                                : "PROMO pachet"}
                             </span>
 
                             {item.latest_promo_label ? (
@@ -612,7 +614,9 @@ export default function WatchlistDetailClient() {
                           ) : null}
 
                           <div className="mt-1 text-[11px] text-amber-50/55">
-                            Reducerea clasică este ascunsă pentru pachete ca să evităm comparații greșite.
+                            {(item.deal_score ?? 0) >= 70
+                              ? "Scorul indică un pachet bun față de criteriile tale."
+                              : "Promoție de tip pachet; avantajul real este evaluat separat prin scor."}
                           </div>
                         </div>
                       ) : (
